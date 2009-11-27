@@ -1,26 +1,5 @@
 
-
-#ifdef HAVE_CONFIG_H
-# include <config.h>
-#endif
-
-
 #include <glib.h>
-
-/* This will prevent compiler errors in some instances and is better explained in the
- * how-to documents on the wiki */
-#ifndef G_GNUC_NULL_TERMINATED
-# if __GNUC__ >= 4
-#  define G_GNUC_NULL_TERMINATED __attribute__((__sentinel__))
-# else
-#  define G_GNUC_NULL_TERMINATED
-# endif
-#endif
-
-
-#ifndef PURPLE_PLUGINS
-# define PURPLE_PLUGINS
-#endif
 
 #include "debug.h"
 #include "internal.h"
@@ -32,25 +11,10 @@
 #include "gtkplugin.h"
 #include "gtkmenutray.h"
 
-#define PLUGIN_ID "sysecure"
+// Allows our button callbacks to actually perform some actions ;)
+#include "conv_encrypt_map.h"
 
-#define PLUGIN_AUTHOR "Hamilton Turner <hamiltont@gmail.com>, Jason Cody <jason.r.cody@vanderbilt.edu>"
-
-/**
- * Used to hold the encryption info for a single conversation 
- */
-// TODO - Move all struct stuff into it's own file, and access
-// the struct using getter methods to hide the allocation, etc
-struct _EncryptionInfo {
-  gboolean is_encrypted;
-};
-typedef struct _EncryptionInfo EncryptionInfo;
-
-/**
- * Used to store the EncryptionInfo information associated with each
- * conversation. 
- */
-static GHashTable *conv_EI = NULL;
+#include "gtk_ui.h"
 
 /**
  * Callback for the 'Enable Encryption' menu item
@@ -65,57 +29,23 @@ enable_encryption_cb(GtkWidget *widget, PidginConversation *gtk_conv)
   // Used to hold the 'active' pidgin conversation
   // We have no guarantee that the conversation passed to us is the 
   // conversation currently showing on the screen (AKA the one we would 
-  // like to turn encryption on for)
-  PidginConversation * active_conv;
-
-  // Setup our struct
-  EncryptionInfo *enc = g_malloc(sizeof(EncryptionInfo));
-  enc->is_encrypted = TRUE;
-
+  // like to turn encryption on for).
   // When someone is using tabbed IMs, the PidginConversation returned
   // to us is the first conversation that opened that window (because the 
   // menubar aka our menuitem exists for _that_ conversation). In order
   // to figure out what conversation that menuitem is not associated with, 
   // we use this method
-  active_conv = pidgin_conv_window_get_active_gtkconv(gtk_conv->win);
+  PidginConversation *active_conv = pidgin_conv_window_get_active_gtkconv(gtk_conv->win);
 
-  g_hash_table_insert(conv_EI,
-		      active_conv->active_conv,
-		      enc);
-
-  purple_debug_info(PLUGIN_ID, 
-		    "Enabled encryption on conversation '%p' with name '%s'\n",
-		    active_conv->active_conv,
-		    purple_conversation_get_name(active_conv->active_conv));
+  enable_encryption(active_conv->active_conv);
 }
 
+// Doesnt do much now but print the encrypted chats onto the debug window
+// TODO - documentation
 static void 
 show_chats_cb(GtkWidget *widget, gboolean data)
 {
-  EncryptionInfo *enc;
-  //GList *conversations = purple_get_conversations();
-  PurpleConversation *conv;
-  
-  GHashTableIter iter;
-  gpointer key, value;
-
-  g_hash_table_iter_init (&iter, conv_EI);
-  while (g_hash_table_iter_next (&iter, &key, &value)) 
-    {
-      /* do something with key and value */
-      conv = key;
-      enc = value;
-      if (enc->is_encrypted)
-	purple_debug_info(PLUGIN_ID,
-			  "Conversation '%p' with name '%s' is encrypted\n",
-			  conv,
-			  purple_conversation_get_name(conv));
-      else
-	purple_debug_info(PLUGIN_ID,
-			  "Conversation '%p' with name '%s' is not encrypted\n",
-			  conv,
-			  purple_conversation_get_name(conv));
-    }
+  debug_conv_encrypt_map();
 }
 
 
@@ -247,26 +177,19 @@ remove_ss_menu_gtk(PidginConversation *gtk_conv)
 		    purple_conversation_get_name(gtk_conv->active_conv));
 }
 
-/**
- * Called when SySecure is first loaded. Registers
- * signal callbacks, and adds SySecure menu to open 
- * conversations
- */
-static gboolean
-plugin_load(PurplePlugin *plugin)
+void
+init_gtk_ui() 
 {
+
   // We need to add the SySecure menu to all currently
   // open conversation windows
   GList *conversations = purple_get_conversations();
  
   // We want to register for the 'conversation-displayed' signal, so 
-  // we can add the button to the created conv window
+  // we can add the button to the created GTK+ conv window
   void *gtk_conversation_handle = pidgin_conversations_get_handle();
-  
-  // Initialize the hash table
-  conv_EI = g_hash_table_new(NULL, NULL);
 
-  // Call us back when a new conv window is created
+    // Call us back when a new conv window is created
   // 'conversation-displayed' is a GTK callback, so this will only
   // be fired if Pidgin is being used
   purple_signal_connect(gtk_conversation_handle, 
@@ -276,8 +199,8 @@ plugin_load(PurplePlugin *plugin)
 			NULL);
   purple_debug_info(PLUGIN_ID,
 		    "Connected conversation-display signal\n");
-
-  // Inject our menu into all open gtk windows
+		    
+		      // Inject our menu into all open gtk windows
   purple_debug_info(PLUGIN_ID,
 		    "Beginning to inject menu into open windows\n");
   while (conversations) {
@@ -294,18 +217,11 @@ plugin_load(PurplePlugin *plugin)
   purple_debug_info(PLUGIN_ID,
 		    "Done injecting button into open windows\n");
 
-  /* Now just return TRUE to tell libpurple to finish loading. */
-  return TRUE;
 }
 
-/**
- * Called when SySecure is unloaded. Unregisters signals and removes
- * SySecure menu from conversations.
- */
-static gboolean
-plugin_unload(PurplePlugin *plugin)
+void 
+uninit_gtk_ui() 
 {
-
   GList *convs = purple_get_conversations();
 
   // We want to register for the 'conversation-displayed' signal, so 
@@ -330,47 +246,5 @@ plugin_unload(PurplePlugin *plugin)
 
     convs = convs->next;
   }
-
-  // I assume this means continue unloading?
-  return TRUE;
 }
-
-static PurplePluginInfo info = {
-	PURPLE_PLUGIN_MAGIC,        /* magic number */
-	PURPLE_MAJOR_VERSION,       /* purple major */
-	PURPLE_MINOR_VERSION,       /* purple minor */
-	PURPLE_PLUGIN_STANDARD,     /* plugin type */
-	PIDGIN_PLUGIN_TYPE,         /* UI requirement */
-	0,                          /* flags */
-	NULL,                       /* dependencies */
-	PURPLE_PRIORITY_DEFAULT,    /* priority */
-
-	PLUGIN_ID,                  /* id */
-	"SySecure",                 /* name */
-	DISPLAY_VERSION,            /* version */
-	"SySecure",                 /* summary */
-	"SySecure Description",     /* description */
-	PLUGIN_AUTHOR,              /* author */
-	"http://pidgin.im",         /* homepage */
-
-	plugin_load,                /* load */
-	plugin_unload,              /* unload */
-	NULL,                       /* destroy */
-
-	NULL,                       /* ui info */
-	NULL,                       /* extra info */
-	NULL,                       /* prefs info */
-	NULL,                       /* actions */
-	NULL,                       /* reserved */
-	NULL,                       /* reserved */
-	NULL,                       /* reserved */
-	NULL                        /* reserved */
-};
-
-static void
-init_plugin(PurplePlugin *plugin)
-{
-}
-
-PURPLE_INIT_PLUGIN(addencryption, init_plugin, info)
 
