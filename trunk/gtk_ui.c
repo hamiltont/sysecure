@@ -1,14 +1,26 @@
+/**
+ * @file
+ * @brief Sets up and manages interfacing SySecure with GTK+. This includes
+ *        adding security options to the chat conversation window(s) and 
+ *        handling callbacks from those options.
+ * 
+ * TODO
+ * Figure out how to link against internal.h so (_("Some String")) works
+ * Add Disable Encryption options
+ * Add some sort of indicator for [un]encrypted messages
+ */ 
 
 #include <glib.h>
 
+// libpurple includes
 #include <debug.h>
 #include <plugin.h>
 #include <version.h>
 
-#include "gtkconv.h"
-#include "gtkimhtml.h"
-#include "gtkplugin.h"
-#include "gtkmenutray.h"
+// pidgin (GTK) includes
+#include <gtkconv.h>
+#include <gtkconvwin.h>
+#include <gtkplugin.h>
 
 // Allows our button callbacks to actually perform some actions ;)
 #include "conv_encrypt_map.h"
@@ -28,11 +40,10 @@ enable_encryption_cb(GtkWidget *widget, PidginConversation *gtk_conv)
   // Used to hold the 'active' pidgin conversation
   // We have no guarantee that the conversation passed to us is the 
   // conversation currently showing on the screen (AKA the one we would 
-  // like to turn encryption on for).
-  // When someone is using tabbed IMs, the PidginConversation returned
-  // to us is the first conversation that opened that window (because the 
-  // menubar aka our menuitem exists for _that_ conversation). In order
-  // to figure out what conversation that menuitem is not associated with, 
+  // like to turn encryption on for). When someone is using tabbed IMs, the 
+  // PidginConversation returned to us is the first conversation that opened 
+  // that window (because the menubar aka our menuitem exists for _that_ 
+  // conversation). In order to figure out what conversation is actually showing
   // we use this method
   PidginConversation *active_conv = pidgin_conv_window_get_active_gtkconv(gtk_conv->win);
 
@@ -46,8 +57,6 @@ show_chats_cb(GtkWidget *widget, gboolean data)
 {
   debug_conv_encrypt_map();
 }
-
-
 
 /**
  * Adds the SySecure menu to a GTK+ (Pidgin) conversation window. 
@@ -176,6 +185,14 @@ remove_ss_menu_gtk(PidginConversation *gtk_conv)
 		    purple_conversation_get_name(gtk_conv->active_conv));
 }
 
+
+/**
+ * Adds the SySecure options to all open GTK user conversations, and connects
+ * a callback for new GTK conversation windows being opened
+ *
+ * @param plugin The SySecure plugin. This is needed to be able to connect 
+ *               signal callbacks. 
+ */
 void
 init_gtk_ui(PurplePlugin *plugin) 
 {
@@ -218,6 +235,13 @@ init_gtk_ui(PurplePlugin *plugin)
 
 }
 
+/**
+ * Removes the SySecure options to all open GTK user conversations, and 
+ * disconnects callbacks for new GTK conversation windows being opened
+ *
+ * @param plugin The SySecure plugin. This is needed to be able to disconnect 
+ *               signal callbacks. 
+ */
 void 
 uninit_gtk_ui(PurplePlugin *plugin) 
 {

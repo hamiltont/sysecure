@@ -47,8 +47,23 @@ get_encryption_info(PurpleConversation *conv)
   
   // Create it if it does not
   if (e_info == NULL)
-    e_info = init_encryption_info();
-    
+    {
+      purple_debug_info(PLUGIN_ID,
+                        "Conversation '%p' with title '%s' has no EncryptionInfo\n",
+                        conv,
+                        purple_conversation_get_name(conv));
+      
+      // Create and insert into hash table
+      e_info = init_encryption_info();
+      g_hash_table_insert(conv_EI,
+                          conv,
+                          e_info);
+                          
+      purple_debug_info(PLUGIN_ID,
+                        "Created and returned EncryptionInfo '%p'\n",
+                        e_info);
+    }
+
   return e_info;  
 }
 
@@ -68,6 +83,27 @@ enable_encryption(PurpleConversation *conv)
 		                 purple_conversation_get_name(conv));
 }
 
+/**
+ * Disables encryption for the passed conversation
+ */
+void 
+disable_encryption(PurpleConversation *conv)
+{
+  EncryptionInfo *e_info = get_encryption_info(conv);
+  
+  e_info->is_encrypted = FALSE;
+  
+  purple_debug_info(PLUGIN_ID, 
+		                "Disabled encryption on conversation '%p' with name '%s'\n",
+		                 conv,
+		                 purple_conversation_get_name(conv));
+}
+
+
+/**
+ * For each entry in the data structure, this prints out the information for 
+ * conversation and for the Encryption Info
+ */
 void 
 debug_conv_encrypt_map()
 {
@@ -104,9 +140,31 @@ init_conv_encryption_map() {
 
 
 /**
- * Cleans up the mapping structure
+ * Cleans up the mapping structure by freeing all memory
  */
 void 
 uninit_conv_encryption_map() {
+  EncryptionInfo *enc;
+  PurpleConversation *conv;
+  GHashTableIter iter;
+  gpointer key, value;
 
+  purple_debug_info(PLUGIN_ID,
+                    "Starting to clean up conversation-encryptionInfo mapping\n");
+  g_hash_table_iter_init (&iter, conv_EI);
+  while (g_hash_table_iter_next (&iter, &key, &value)) 
+    {
+      conv = key;
+      enc = value;
+      uninit_encryption_info(enc);
+      purple_debug_info(PLUGIN_ID,
+                        "Freed EncryptionInfo '%p' from conversation '%p' with name '%s'\n",
+                        enc,
+                        conv,
+                        purple_conversation_get_name(conv));
+    }
+  purple_debug_info(PLUGIN_ID,
+                    "Done cleaning up conversation-encryptionInfo mapping\n");
+  
+  // TODO - do I need to free memory here?
 }
