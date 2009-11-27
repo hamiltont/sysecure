@@ -23,6 +23,6 @@ typedef struct _EncryptionInfo EncryptionInfo;
 
 EncryptionInfo * init_encryption_info();
 
-void uninit_encryption_info();
+void uninit_encryption_info(EncryptionInfo *e_info);
 
 #endif

@@ -1,7 +1,16 @@
+/**
+ * @file
+ * @brief Holds all of the globals needed by many core files in SySecure 
+ * 
+ * Currently holds the EncryptionInfo structure, and some #defines for PLUGIN
+ * information
+ */
 
 #include "globals.h"
 
-
+/**
+ * Allocates and initializes a default EncryptionInfo object
+ */
 EncryptionInfo *
 init_encryption_info() {
   // Get some memory
@@ -13,7 +22,10 @@ init_encryption_info() {
   return enc;
 }
 
+/**
+ * Cleans up previously allocated EncryptionInfo
+ */
 void 
-uninit_encryption_info() {
-  // TODO  -free memort
+uninit_encryption_info(EncryptionInfo * e_info) {
+  g_free(e_info);
 }

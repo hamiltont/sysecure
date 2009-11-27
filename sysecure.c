@@ -54,7 +54,10 @@ static gboolean
 plugin_unload(PurplePlugin *plugin)
 {
   // unload the GTK+ UI
-  //uninit_gtk_ui(plugin);
+  uninit_gtk_ui(plugin);
+  
+  // unload the encryption mapping
+  uninit_conv_encryption_map();
   
   // I assume this means continue unloading?
   return TRUE;
