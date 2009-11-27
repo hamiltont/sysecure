@@ -17,16 +17,10 @@
 # define PURPLE_PLUGINS
 #endif
 
-#include <glib.h>
-#include "plugin.h"
-#include "version.h"
-#include "gtkplugin.h"
-
-#define PLUGIN_ID "sysecure"
-#define PLUGIN_AUTHOR "Hamilton Turner <hamiltont@gmail.com>, \
-                       Jason Cody <jason.r.cody@vanderbilt.edu>"
-#define PLUGIN_SUMMARY "summary"
-#define PLUGIN_DESC "desc"
+#include <plugin.h>
+#include <version.h>
+#include <gtkplugin.h>
+#include <version.h>
 
 #include "sysecure.h"
 
@@ -46,7 +40,7 @@ static gboolean plugin_load(PurplePlugin *plugin)
   init_conv_encryption_map();
 
   // Initialize the UI for GTK+
-  init_gtk_ui();
+  init_gtk_ui(plugin);
   
   /* Now just return TRUE to tell libpurple to finish loading. */
   return TRUE;
@@ -60,7 +54,7 @@ static gboolean
 plugin_unload(PurplePlugin *plugin)
 {
   // unload the GTK+ UI
-  //uninit_gtk_ui();
+  //uninit_gtk_ui(plugin);
   
   // I assume this means continue unloading?
   return TRUE;
@@ -78,7 +72,7 @@ static PurplePluginInfo info = {
 
 	PLUGIN_ID,                  /* id */
 	"SySecure",                 /* name */
-	DISPLAY_VERSION,            /* version */
+	PLUGIN_VERSION,            /* version */
 	PLUGIN_SUMMARY,             /* summary */
   PLUGIN_DESC,                /* description */
 	PLUGIN_AUTHOR,              /* author */

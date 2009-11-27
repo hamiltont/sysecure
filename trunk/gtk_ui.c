@@ -1,10 +1,9 @@
 
 #include <glib.h>
 
-#include "debug.h"
-#include "internal.h"
-#include "plugin.h"
-#include "version.h"
+#include <debug.h>
+#include <plugin.h>
+#include <version.h>
 
 #include "gtkconv.h"
 #include "gtkimhtml.h"
@@ -86,7 +85,7 @@ add_ss_menu_gtk(PidginConversation *gtk_conv)
 
   // Create the submenu
   submenu = gtk_menu_new();
-  submenuitem = gtk_menu_item_new_with_label (_("Enable Encryption"));
+  submenuitem = gtk_menu_item_new_with_label ("Enable Encryption");
   gtk_menu_shell_append(GTK_MENU_SHELL(submenu), 
 			submenuitem);
   gtk_widget_show(submenuitem);
@@ -94,7 +93,7 @@ add_ss_menu_gtk(PidginConversation *gtk_conv)
 		   "activate", 
 		   G_CALLBACK(enable_encryption_cb), 
 		   gtk_conv);
-  submenuitem = gtk_menu_item_new_with_label (_("Show Chats"));
+  submenuitem = gtk_menu_item_new_with_label ("Show Chats");
   gtk_menu_shell_append(GTK_MENU_SHELL(submenu), 
 			submenuitem);
   gtk_widget_show(submenuitem);
@@ -105,7 +104,7 @@ add_ss_menu_gtk(PidginConversation *gtk_conv)
 
   // Add the SySecure menu item to the window menubar, and 
   // attach the submenu to the menu item
-  ss_menuitem = gtk_menu_item_new_with_label (_("SySecure"));
+  ss_menuitem = gtk_menu_item_new_with_label ("SySecure");
   gtk_menu_shell_append(GTK_MENU_SHELL(menubar),
 			ss_menuitem);
   gtk_menu_item_set_submenu(GTK_MENU_ITEM(ss_menuitem),
@@ -178,7 +177,7 @@ remove_ss_menu_gtk(PidginConversation *gtk_conv)
 }
 
 void
-init_gtk_ui() 
+init_gtk_ui(PurplePlugin *plugin) 
 {
 
   // We need to add the SySecure menu to all currently
@@ -220,7 +219,7 @@ init_gtk_ui()
 }
 
 void 
-uninit_gtk_ui() 
+uninit_gtk_ui(PurplePlugin *plugin) 
 {
   GList *convs = purple_get_conversations();
 
