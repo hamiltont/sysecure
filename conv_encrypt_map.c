@@ -14,6 +14,9 @@
 // Needed for a lot
 #include <glib.h>
 
+// libpurple debugging
+#include <debug.h>
+
 // Needed for PurpleConversation
 #include "conversation.h"
 
@@ -57,7 +60,7 @@ enable_encryption(PurpleConversation *conv)
 {
   EncryptionInfo *e_info = get_encryption_info(conv);
   
-  e_info->is_enabled = TRUE;
+  e_info->is_encrypted = TRUE;
   
   purple_debug_info(PLUGIN_ID, 
 		                "Enabled encryption on conversation '%p' with name '%s'\n",

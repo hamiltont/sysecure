@@ -2,7 +2,7 @@
 #define CONV_ENCRYPT_MAP
 
 // Needed for PurpleConversation
-#include "conversation.h"
+#include <conversation.h>
 
 // Needed for EncryptionInfo
 #include "globals.h"
