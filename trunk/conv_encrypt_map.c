@@ -161,6 +161,19 @@ init_conv_encryption_map() {
   conv_EI = g_hash_table_new(NULL, NULL);
 }
 
+static void
+memory_free_foreach_cb(gpointer key, gpointer value, gpointer user_data)
+{
+  EncryptionInfo *enc = value;
+  PurpleConversation *conv = key;
+  
+  uninit_encryption_info(enc);
+  purple_debug_info(PLUGIN_ID,
+                    "Freed EncryptionInfo '%p' from conversation '%p' with name '%s'\n",
+                    enc,
+                    conv,
+                    purple_conversation_get_name(conv));
+}
 
 /**
  * Cleans up the mapping structure by freeing all memory
@@ -168,29 +181,17 @@ init_conv_encryption_map() {
 void 
 uninit_conv_encryption_map() {
 
-  EncryptionInfo *enc;
-  PurpleConversation *conv;
-/*  GHashTableIter iter;
-  gpointer key, value;
-
   purple_debug_info(PLUGIN_ID,
                     "Starting to clean up conversation-encryptionInfo mapping\n");
-  g_hash_table_iter_init (&iter, conv_EI);
-  while (g_hash_table_iter_next (&iter, &key, &value)) 
-    {
-      conv = key;
-      enc = value;
-      uninit_encryption_info(enc);
-      purple_debug_info(PLUGIN_ID,
-                        "Freed EncryptionInfo '%p' from conversation '%p' with name '%s'\n",
-                        enc,
-                        conv,
-                        purple_conversation_get_name(conv));
-    }
+  
+  g_hash_table_foreach(conv_EI,
+                       memory_free_foreach_cb,
+                       NULL);
+  
   purple_debug_info(PLUGIN_ID,
                     "Done cleaning up conversation-encryptionInfo mapping\n");
   
-  // TODO - do I need to free memory here?
-*/
+  // clean up our hash table
+  g_hash_table_destroy(conv_EI);
 }
 #endif
