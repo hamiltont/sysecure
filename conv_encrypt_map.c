@@ -20,6 +20,9 @@
  * object will be created and returned. When the uninit method of this class 
  * is called, it cleans up the memory used, and has a change to store some 
  * information permanently (although right now it does not). 
+ * TODO - add a getEncryptionInfo message so they can get the EncryptionInfo
+ *        from the receiver name, as well as conversation. Because we are not 
+ *        securing chats, this should always work 
  */
 
 // Needed for a lot
