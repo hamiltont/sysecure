@@ -8,6 +8,7 @@
 #  define G_GNUC_NULL_TERMINATED
 # endif
 #endif
+
 /**
  * @file
  * @brief This file presents an interface to allow a mapping between a unique
@@ -109,25 +110,35 @@ disable_encryption(PurpleConversation *conv)
 		                 purple_conversation_get_name(conv));
 }
 
-void encrypt_check (gpointer key, gpointer value, gpointer userdata)
+
+/**
+ * Helper function that prints out information about every value stored in the 
+ * hashtable currently.
+ *
+ * @param key The GHashTable key, currently an EncryptionInfo struct
+ * @param value The GHashTable value, currently a PurpleConversation
+ * @param user_data Any random user data that the calling function passes. 
+ *        Currently this field is ignored. 
+ */
+static void
+debug_helper_foreach_cb(gpointer key, gpointer value, gpointer user_data) 
 {
-  EncryptionInfo *enc;
-  PurpleConversation *conv;
-      conv = key;
-      enc = value;
-      if (enc->is_encrypted)
-	      purple_debug_info(PLUGIN_ID,
-			                    "Conversation '%p' with name '%s' is encrypted\n",
-			                    conv,
-			                    purple_conversation_get_name(conv));
-      else
-	      purple_debug_info(PLUGIN_ID,
-			                    "Conversation '%p' with name '%s' is not encrypted\n",
-			                    conv,
-			                    purple_conversation_get_name(conv));
-
-
+  EncryptionInfo *enc = (EncryptionInfo*)value;
+  PurpleConversation *conv = (PurpleConversation*)key;
+  
+  if (enc->is_encrypted)
+    purple_debug_info(PLUGIN_ID,
+			                "Conversation '%p' with name '%s' is encrypted\n",
+			                conv,
+			                purple_conversation_get_name(conv));
+  else
+    purple_debug_info(PLUGIN_ID,
+			                "Conversation '%p' with name '%s' is not encrypted\n",
+			                conv,
+			                purple_conversation_get_name(conv));
+			                
 }
+
 
 /**
  * For each entry in the data structure, this prints out the information for 
@@ -135,31 +146,10 @@ void encrypt_check (gpointer key, gpointer value, gpointer userdata)
  */
 void 
 debug_conv_encrypt_map()
-{
-  EncryptionInfo *enc;
-  PurpleConversation *conv;
-/*  
-  GHashTableIter iter;
-  gpointer key, value;
-
-  g_hash_table_iter_init (&iter, conv_EI);
-  while (g_hash_table_iter_next (&iter, &key, &value)) 
-    {
-      conv = key;
-      enc = value;
-      if (enc->is_encrypted)
-	      purple_debug_info(PLUGIN_ID,
-			                    "Conversation '%p' with name '%s' is encrypted\n",
-			                    conv,
-			                    purple_conversation_get_name(conv));
-      else
-	      purple_debug_info(PLUGIN_ID,
-			                    "Conversation '%p' with name '%s' is not encrypted\n",
-			                    conv,
-			                    purple_conversation_get_name(conv));
-    }
-
-*/
+{  
+  g_hash_table_foreach(conv_EI,
+                       debug_helper_foreach_cb,
+                       NULL);
 
 }
 
