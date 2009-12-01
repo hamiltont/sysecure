@@ -9,6 +9,8 @@
 
 EncryptionInfo *get_encryption_info(PurpleConversation *conv);
 
+EncryptionInfo * get_encryption_info_from_name(const char * conversation_name);
+
 void enable_encryption(PurpleConversation *conv);
 
 void disable_encryption(PurpleConversation *conv);
