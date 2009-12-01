@@ -73,8 +73,7 @@ char* SYS_tag_check (char *message, char *tag);
 gboolean SYS_incoming_cb (PurpleAccount *acct, char **who, char **message,
                                     PurpleConversation *conv, int *flags);
 
-gboolean SYS_outgoing_cb (PurpleAccount *acct, char **who, char **message,
-                                    PurpleConversation *conv, int *flags);
+gboolean SYS_outgoing_cb (PurpleAccount *account, const char *receiver, char **message);
 
 
 #endif //MSG_HANDLE_H
