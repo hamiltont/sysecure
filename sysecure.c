@@ -28,6 +28,7 @@
 #include "conv_encrypt_map.h"
 #include "gtk_ui.h"
 #include "msg_handle.h"
+#include "pub_key.h"
 
 /**
  * Called when SySecure is first loaded. Registers signal callbacks, 
@@ -37,6 +38,8 @@ static gboolean plugin_load(PurplePlugin *plugin)
 {
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Compiled with Purple '%d.%d.%d'.\n",
              PURPLE_MAJOR_VERSION, PURPLE_MINOR_VERSION, PURPLE_MICRO_VERSION);
+
+  nss_init();
   
   // TODO: If we plan to use a UI other than GTK+, we should register for the
   //       signals for that UI here. 

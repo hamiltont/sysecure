@@ -55,15 +55,7 @@
 #include "stdio.h"
 #include "time.h"
 #include "stdlib.h"
-
-//NSS includes:
-#include "nss.h"
-#include "nspr.h"
-#include <ssl.h>
-#include <secmod.h>
-#include <pk11func.h>
-#include <keyhi.h>
-#include <nssb64.h>
+#include "string.h"
 
 //SYSECURE includes:
 #include "conv_encrypt_map.h"
