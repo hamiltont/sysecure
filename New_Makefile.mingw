@@ -15,6 +15,11 @@ ifeq ($(WINDOWS),0)
 else
 
   # Windows Plugin Directory Settings
+  PIDGIN_TREE_TOP := ../../..
+  include $(PIDGIN_TREE_TOP)/libpurple/win32/global.mak
+  NSS_TOP := ../../../../win32-dev/nss-3.11.4/include
+  NSPR_TOP := ../../../../win32-dev/nspr-4.6.4/include
+  SYSECURE_TOP := ./
 
   PLUGINDIR="$(HOME)/Application Data/.purple/plugins"
 
@@ -25,7 +30,7 @@ endif
 
 # This only matters on Windows.
 GAIM_SOURCE_DIR=../gaim
-GTK_TOP=../win32-dev/gtk_2_0
+GTK_TOP=../../../../win32-dev/gtk_2_0
 
 # DO NOT EDIT BELOW THIS LINE
 
@@ -33,8 +38,10 @@ PACKAGE=sysecure
 VERSION=0.1
 
 SOURCES = sysecure.o globals.o conv_encrypt_map.o gtk_ui.o
+SOURCES_O = globals.o conv_encrypt_map.o gtk_ui.o msg_handle.o
+SOURCES_C = globals.c conv_encrypt_map.c gtk_ui.c msg_handle.c
           
-UI=$(PACKAGE)-ui
+#UI=$(PACKAGE)-ui
 PACKDIR=/tmp/pidgin-$(PACKAGE)-$(VERSION)
 
 ifeq ($(WINDOWS),0)
@@ -66,19 +73,31 @@ else
 
   # Windows Compiler Stuff
 
-  WIN32_CFLAGS= -I"$(TOPDIR)$(GTK_TOP)/include/atk-1.0" \
-                -I"$(TOPDIR)$(GTK_TOP)/include/glib-2.0" \
-                -I"$(TOPDIR)$(GTK_TOP)/include/gtk-2.0" \
-                -I"$(TOPDIR)$(GTK_TOP)/include/freetype2" \
-                -I"$(TOPDIR)$(GTK_TOP)/include/libpng13" \
-                -I"$(TOPDIR)$(GTK_TOP)/include/pango-1.0" \
-                -I"$(TOPDIR)$(GTK_TOP)/lib/glib-2.0/include" \
-                -I"$(TOPDIR)$(GTK_TOP)/lib/gtk-2.0/include" \
-                -I"$(TOPDIR)$(GAIM_SOURCE_DIR)/libgaim" \
-                -I"$(TOPDIR)$(GAIM_SOURCE_DIR)/gtk" \
-                -I"$(TOPDIR)$(GAIM_SOURCE_DIR)/gtk/win32" \
+  WIN32_CFLAGS= -I"$(GTK_TOP)/include/atk-1.0" \
+                -I"$(GTK_TOP)/include/glib-2.0" \
+                -I"$(GTK_TOP)/include/gtk-2.0" \
+                -I"$(GTK_TOP)/include/freetype2" \
+                -I"$(GTK_TOP)/include/libpng13" \
+                -I"$(GTK_TOP)/include/pango-1.0" \
+                -I"$(GTK_TOP)/lib/glib-2.0/include" \
+                -I"$(GTK_TOP)/lib/gtk-2.0/include" \
+                -I"$(GAIM_SOURCE_DIR)/libgaim" \
+                -I"$(GAIM_SOURCE_DIR)/gtk" \
+                -I"$(GAIM_SOURCE_DIR)/gtk/win32" \
+                -I"$(PIDGIN_TREE_TOP)" \
+                -I"$(PURPLE_TOP)" \
+                -I"$(PURPLE_TOP)/win32" \
+                -I"$(PIDGIN_TOP)" \
+                -I"$(PIDGIN_TOP)/win32" \
+                -I"$(NSS_TOP)" \
+                -I"$(SYSECURE_TOP)" \
+                -I"$(NSPR_TOP)" \
 		-mno-cygwin -mms-bitfields \
                 $(CFLAGS)
+
+LIB_PATHS +=		-L$(GTK_TOP)/lib \
+			-L$(PURPLE_TOP) \
+			-L$(PIDGIN_TOP)
 
   WIN32_LIBS=   -lgtk-win32-2.0 \
                 -lglib-2.0 \
@@ -89,8 +108,8 @@ else
                 -lpango-1.0 \
                 -lintl \
                 -lws2_32 \
-                -lgtkgaim \
-                -lgaim
+                -lpurple \
+                -lpidgin
 
   SHARED_OBJECT_SUFFIX=.dll
 
@@ -128,9 +147,21 @@ help:			# Displays usage information
 $(PACKAGE).so: $(PACKAGE).o $(SOURCES)
 	$(LINK.o) --shared $^ $(LOADLIBES) $(LDLIBS) -o $@
 
-$(PACKAGE).dll: $(PACKAGE).c $(UI).c
+globals.o : globals.c globals.h
+	$(CC) $(WIN32_CFLAGS) -o globals.o -c globals.c
+
+conv_encrypt_map.o : conv_encrypt_map.c conv_encrypt_map.h
+	$(CC) $(WIN32_CFLAGS) -o conv_encrypt_map.o -c conv_encrypt_map.c
+
+gtk_ui.o : gtk_ui.c gtk_ui.h
+	$(CC) $(WIN32_CFLAGS) -o gtk_ui.o -c gtk_ui.c
+
+msg_handle.o : msg_handle.c msg_handle.h
+	$(CC) $(WIN32_CFLAGS) -o msg_handle.o -c msg_handle.c
+
+$(PACKAGE).dll: $(PACKAGE).c $(SOURCES_C)
 	$(CC) $(WIN32_CFLAGS) -o $(PACKAGE).o -c $(PACKAGE).c
-	$(CC) $(WIN32_CFLAGS) -o $(UI).o -c $(UI).c
-	$(CC) -shared $(PACKAGE).o $(UI).o -L"$(TOPDIR)$(GTK_TOP)/lib" -L"$(TOPDIR)$(GAIM_SOURCE_DIR)/libgaim" -L"$(TOPDIR)$(GAIM_SOURCE_DIR)/gtk" $(WIN32_LIBS) $(DLL_LD_FLAGS) -o $@
+	$(CC) -shared $(PACKAGE).o $(SOURCES_O) $(LIB_PATHS) $(WIN32_LIBS) $(DLL_LD_FLAGS) -o $@
 
 .PHONY: all build rebuild package install clean distclean help
+
