@@ -34,6 +34,9 @@
 
 #include "gtk_ui.h"
 
+static GtkWidget * encryption_menuitem,
+                 * decryption_menuitem;
+
 /**
  * Callback for the 'Enable Encryption' menu item
  * @param widget The widget that caused this callback. In this case, 
@@ -55,6 +58,41 @@ enable_encryption_cb(GtkWidget *widget, PidginConversation *gtk_conv)
   PidginConversation *active_conv = pidgin_conv_window_get_active_gtkconv(gtk_conv->win);
 
   enable_encryption(active_conv->active_conv);
+  
+  gtk_widget_set_sensitive(encryption_menuitem,
+                           FALSE);
+  gtk_widget_set_sensitive(decryption_menuitem,
+                           TRUE);
+
+}
+
+/**
+ * Callback for the 'Disable Encryption' menu item
+ * @param widget The widget that caused this callback. In this case, 
+ *               the Menuitem
+ * @param gtk_conv The GTK+ (Pidgin) conversation showing when this 
+ *                 menu item was clicked. 
+ */
+static void 
+disable_encryption_cb(GtkWidget *widget, PidginConversation *gtk_conv)
+{
+  // Used to hold the 'active' pidgin conversation
+  // We have no guarantee that the conversation passed to us is the 
+  // conversation currently showing on the screen (AKA the one we would 
+  // like to turn encryption on for). When someone is using tabbed IMs, the 
+  // PidginConversation returned to us is the first conversation that opened 
+  // that window (because the menubar aka our menuitem exists for _that_ 
+  // conversation). In order to figure out what conversation is actually showing
+  // we use this method
+  PidginConversation *active_conv = pidgin_conv_window_get_active_gtkconv(gtk_conv->win);
+
+  disable_encryption(active_conv->active_conv);
+  
+  gtk_widget_set_sensitive(encryption_menuitem,
+                           TRUE);
+  gtk_widget_set_sensitive(decryption_menuitem,
+                           FALSE);
+
 }
 
 // Doesnt do much now but print the encrypted chats onto the debug window
@@ -63,6 +101,29 @@ static void
 show_chats_cb(GtkWidget *widget, gboolean data)
 {
   debug_conv_encrypt_map();
+}
+
+/**
+ * Callback for the active conversation switching. Updates the menu items 
+ * appropriately.
+ */
+static void 
+conversation_switched_cb(PurpleConversation *conv)
+{
+  if (get_encryption_info(conv)->is_encrypted == TRUE) 
+  {
+    gtk_widget_set_sensitive(encryption_menuitem,
+                             FALSE);
+    gtk_widget_set_sensitive(decryption_menuitem,
+                             TRUE);                         
+  }
+  else
+  {
+    gtk_widget_set_sensitive(encryption_menuitem,
+                             TRUE);
+    gtk_widget_set_sensitive(decryption_menuitem,
+                             FALSE);
+  }
 }
 
 /**
@@ -76,7 +137,7 @@ show_chats_cb(GtkWidget *widget, gboolean data)
  *                 always be TRUE
  */
 static void
-add_ss_menu_gtk(PidginConversation *gtk_conv)
+conversation_displayed_cb(PidginConversation *gtk_conv)
 {
   // Items we will be creating
   GtkWidget *submenu, *submenuitem, *ss_menuitem;
@@ -99,16 +160,29 @@ add_ss_menu_gtk(PidginConversation *gtk_conv)
       return;
     }
 
-  // Create the submenu
+  //===== Create the submenu ===========
+  // First, create and connect the encryption button
   submenu = gtk_menu_new();
-  submenuitem = gtk_menu_item_new_with_label ("Enable Encryption");
+  encryption_menuitem = gtk_menu_item_new_with_label ("Enable Encryption");
   gtk_menu_shell_append(GTK_MENU_SHELL(submenu), 
-			submenuitem);
-  gtk_widget_show(submenuitem);
-  g_signal_connect(G_OBJECT(submenuitem), 
+			encryption_menuitem);
+  gtk_widget_show(encryption_menuitem);
+  g_signal_connect(G_OBJECT(encryption_menuitem), 
 		   "activate", 
 		   G_CALLBACK(enable_encryption_cb), 
+		   gtk_conv);	   
+	
+	// Then the decryption button
+	decryption_menuitem = gtk_menu_item_new_with_label ("Disable Encryption");
+  gtk_menu_shell_append(GTK_MENU_SHELL(submenu), 
+			decryption_menuitem);
+  gtk_widget_show(decryption_menuitem);
+  g_signal_connect(G_OBJECT(decryption_menuitem), 
+		   "activate", 
+		   G_CALLBACK(disable_encryption_cb), 
 		   gtk_conv);
+
+	// Then the Show Chats button
   submenuitem = gtk_menu_item_new_with_label ("Show Chats");
   gtk_menu_shell_append(GTK_MENU_SHELL(submenu), 
 			submenuitem);
@@ -139,6 +213,22 @@ add_ss_menu_gtk(PidginConversation *gtk_conv)
 		    "Added the SySecure Menu to chat '%s', window '%p'\n", 
 		    purple_conversation_get_name(gtk_conv->active_conv),
 		    gtk_conv->win);
+		    
+  // Setup the menu options appropriately
+  if (get_encryption_info(gtk_conv->active_conv)->is_encrypted == TRUE) 
+  {
+    gtk_widget_set_sensitive(encryption_menuitem,
+                             FALSE);
+    gtk_widget_set_sensitive(decryption_menuitem,
+                             TRUE);                         
+  }
+  else
+  {
+    gtk_widget_set_sensitive(encryption_menuitem,
+                             TRUE);
+    gtk_widget_set_sensitive(decryption_menuitem,
+                             FALSE);
+  }
 }
 
 /**
@@ -212,13 +302,13 @@ init_gtk_ui(PurplePlugin *plugin)
   // we can add the button to the created GTK+ conv window
   void *gtk_conversation_handle = pidgin_conversations_get_handle();
 
-    // Call us back when a new conv window is created
+  // Call us back when a new conv window is created
   // 'conversation-displayed' is a GTK callback, so this will only
   // be fired if Pidgin is being used
   purple_signal_connect(gtk_conversation_handle, 
 			"conversation-displayed", 
 			plugin, 
-			PURPLE_CALLBACK(add_ss_menu_gtk), 
+			PURPLE_CALLBACK(conversation_displayed_cb), 
 			NULL);
   purple_debug_info(PLUGIN_ID,
 		    "Connected conversation-display signal\n");
@@ -232,14 +322,24 @@ init_gtk_ui(PurplePlugin *plugin)
 
     // Only inject if this is a gtk window
     if (PIDGIN_IS_PIDGIN_CONVERSATION(current_conv))
-      add_ss_menu_gtk(PIDGIN_CONVERSATION(current_conv));
+      conversation_displayed_cb(PIDGIN_CONVERSATION(current_conv));
 
     conversations = conversations->next;
   }
 
   purple_debug_info(PLUGIN_ID,
 		    "Done injecting button into open windows\n");
-
+		    
+  // Call us back when the active conv window is switched
+  // 'conversation-switched' is a GTK callback, so this will only
+  // be fired if Pidgin is being used
+  purple_signal_connect(gtk_conversation_handle, 
+			"conversation-switched", 
+			plugin, 
+			PURPLE_CALLBACK(conversation_switched_cb), 
+			NULL);
+  purple_debug_info(PLUGIN_ID,
+		    "Connected conversation-switched signal\n");
 }
 
 /**
@@ -258,14 +358,21 @@ uninit_gtk_ui(PurplePlugin *plugin)
   // we can add the button to the created conv window
   void *gtk_conversation_handle = pidgin_conversations_get_handle();
 
-  // Call us back when a new conv window is created
+  // Clean up our connected signals
   purple_signal_disconnect(gtk_conversation_handle, 
 			   "conversation-displayed", 
 			   plugin, 
-			   PURPLE_CALLBACK(add_ss_menu_gtk));
-
+			   PURPLE_CALLBACK(conversation_displayed_cb));
   purple_debug_info(PLUGIN_ID,
 		    "Disconnected conversation-display signal\n");  
+
+  // Clean up our connected signals
+  purple_signal_disconnect(gtk_conversation_handle, 
+			"conversation-switched", 
+			plugin, 
+			PURPLE_CALLBACK(conversation_switched_cb));
+	purple_debug_info(PLUGIN_ID,
+		    "Disconnected conversation-switched signal\n");  
 
   while (convs) {
     PurpleConversation *conv = (PurpleConversation *)convs->data;
