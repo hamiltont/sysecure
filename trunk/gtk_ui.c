@@ -32,6 +32,9 @@
 // Allows our button callbacks to actually perform some actions ;)
 #include "conv_encrypt_map.h"
 
+// Used to debug the session stuff
+#include "session_keys.h"
+
 #include "gtk_ui.h"
 
 static GtkWidget * encryption_menuitem,
@@ -126,6 +129,14 @@ conversation_switched_cb(PurpleConversation *conv)
   }
 }
 
+// Doesnt do much 
+// TODO - documentation or remove
+static void 
+debug_session_cb(GtkWidget *widget, gboolean data)
+{
+  debug_symmetric_key(generate_symmetric_key());
+}
+
 /**
  * Adds the SySecure menu to a GTK+ (Pidgin) conversation window. 
  * Checks to be sure the menu is not already present. 
@@ -190,6 +201,16 @@ conversation_displayed_cb(PidginConversation *gtk_conv)
   g_signal_connect(G_OBJECT(submenuitem), 
 		   "activate", 
 		   G_CALLBACK(show_chats_cb), 
+		   NULL);
+		   
+  // Then the Debug Session Key button
+  submenuitem = gtk_menu_item_new_with_label ("Debug Session Key");
+  gtk_menu_shell_append(GTK_MENU_SHELL(submenu), 
+			submenuitem);
+  gtk_widget_show(submenuitem);
+  g_signal_connect(G_OBJECT(submenuitem), 
+		   "activate", 
+		   G_CALLBACK(debug_session_cb), 
 		   NULL);
 
   // Add the SySecure menu item to the window menubar, and 
