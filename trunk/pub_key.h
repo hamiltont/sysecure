@@ -24,7 +24,7 @@ typedef struct {
   SECKEYPublicKey* pub;
 } RSA_Key_Pair;
 
-void generate_RSA_Key_Pair (RSA_Key_Pair* temp_key);
+void generate_RSA_Key_Pair (RSA_Key_Pair** temp_key);
 
 void init_pub_key (char* name);
 
