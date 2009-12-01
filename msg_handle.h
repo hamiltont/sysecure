@@ -59,6 +59,7 @@
 
 //SYSECURE includes:
 #include "conv_encrypt_map.h"
+#include "pub_key.h"
 
 char* SYS_tag_check (char *message, char *tag);
 

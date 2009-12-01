@@ -17,8 +17,8 @@ else
   # Windows Plugin Directory Settings
   PIDGIN_TREE_TOP := ../../..
   include $(PIDGIN_TREE_TOP)/libpurple/win32/global.mak
-  NSS_TOP := ../../../../win32-dev/nss-3.11.4/include
-  NSPR_TOP := ../../../../win32-dev/nspr-4.6.4/include
+  NSS_TOP := ../../../../win32-dev/nss-3.11.4
+  NSPR_TOP := ../../../../win32-dev/nspr-4.6.4
   SYSECURE_TOP := ./
 
   PLUGINDIR="$(HOME)/Application Data/.purple/plugins"
@@ -89,15 +89,17 @@ else
                 -I"$(PURPLE_TOP)/win32" \
                 -I"$(PIDGIN_TOP)" \
                 -I"$(PIDGIN_TOP)/win32" \
-                -I"$(NSS_TOP)" \
+                -I"$(NSS_TOP)/include" \
                 -I"$(SYSECURE_TOP)" \
-                -I"$(NSPR_TOP)" \
+                -I"$(NSPR_TOP)/include" \
 		-mno-cygwin -mms-bitfields \
                 $(CFLAGS)
 
 LIB_PATHS +=		-L$(GTK_TOP)/lib \
 			-L$(PURPLE_TOP) \
-			-L$(PIDGIN_TOP)
+			-L$(PIDGIN_TOP) \
+			-L$(NSS_TOP)/lib \
+			-L$(NSPR_TOP)/lib
 
   WIN32_LIBS=   -lgtk-win32-2.0 \
                 -lglib-2.0 \
@@ -109,7 +111,10 @@ LIB_PATHS +=		-L$(GTK_TOP)/lib \
                 -lintl \
                 -lws2_32 \
                 -lpurple \
-                -lpidgin
+                -lpidgin \
+                -lnss3 \
+                -lnspr4 \
+                 -lssl3
 
   SHARED_OBJECT_SUFFIX=.dll
 

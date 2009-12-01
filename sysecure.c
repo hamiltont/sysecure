@@ -39,8 +39,9 @@ static gboolean plugin_load(PurplePlugin *plugin)
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Compiled with Purple '%d.%d.%d'.\n",
              PURPLE_MAJOR_VERSION, PURPLE_MINOR_VERSION, PURPLE_MICRO_VERSION);
 
-  nss_init();
-  
+  if (!nss_init())
+    purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "NSS is not enabled.  SySecure unavailable.\n");
+
   // TODO: If we plan to use a UI other than GTK+, we should register for the
   //       signals for that UI here. 
 
