@@ -1,3 +1,13 @@
+#ifndef CONV_ENCRYPT_MAP_C
+#define CONV_ENCRYPT_MAP_C
+
+#ifndef G_GNUC_NULL_TERMINATED
+# if __GNUC__ >= 4
+#  define G_GNUC_NULL_TERMINATED __attribute__((__sentinel__))
+# else
+#  define G_GNUC_NULL_TERMINATED
+# endif
+#endif
 /**
  * @file
  * @brief This file presents an interface to allow a mapping between a unique
@@ -99,6 +109,25 @@ disable_encryption(PurpleConversation *conv)
 		                 purple_conversation_get_name(conv));
 }
 
+void encrypt_check (gpointer key, gpointer value, gpointer userdata)
+{
+  EncryptionInfo *enc;
+  PurpleConversation *conv;
+      conv = key;
+      enc = value;
+      if (enc->is_encrypted)
+	      purple_debug_info(PLUGIN_ID,
+			                    "Conversation '%p' with name '%s' is encrypted\n",
+			                    conv,
+			                    purple_conversation_get_name(conv));
+      else
+	      purple_debug_info(PLUGIN_ID,
+			                    "Conversation '%p' with name '%s' is not encrypted\n",
+			                    conv,
+			                    purple_conversation_get_name(conv));
+
+
+}
 
 /**
  * For each entry in the data structure, this prints out the information for 
@@ -109,6 +138,7 @@ debug_conv_encrypt_map()
 {
   EncryptionInfo *enc;
   PurpleConversation *conv;
+/*  
   GHashTableIter iter;
   gpointer key, value;
 
@@ -128,6 +158,9 @@ debug_conv_encrypt_map()
 			                    conv,
 			                    purple_conversation_get_name(conv));
     }
+
+*/
+
 }
 
 /**
@@ -144,9 +177,10 @@ init_conv_encryption_map() {
  */
 void 
 uninit_conv_encryption_map() {
+
   EncryptionInfo *enc;
   PurpleConversation *conv;
-  GHashTableIter iter;
+/*  GHashTableIter iter;
   gpointer key, value;
 
   purple_debug_info(PLUGIN_ID,
@@ -167,4 +201,6 @@ uninit_conv_encryption_map() {
                     "Done cleaning up conversation-encryptionInfo mapping\n");
   
   // TODO - do I need to free memory here?
+*/
 }
+#endif

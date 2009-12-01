@@ -21,11 +21,13 @@
 #include <version.h>
 #include <gtkplugin.h>
 #include <version.h>
+#include <debug.h>
 
 #include "sysecure.h"
 
 #include "conv_encrypt_map.h"
 #include "gtk_ui.h"
+#include "msg_handle.h"
 
 /**
  * Called when SySecure is first loaded. Registers signal callbacks, 
@@ -33,14 +35,26 @@
  */
 static gboolean plugin_load(PurplePlugin *plugin)
 {
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Compiled with Purple '%d.%d.%d'.\n",
+             PURPLE_MAJOR_VERSION, PURPLE_MINOR_VERSION, PURPLE_MICRO_VERSION);
+  
   // TODO: If we plan to use a UI other than GTK+, we should register for the
   //       signals for that UI here. 
+
+  void * conv_handle;
+  //Get Conversation Handle and initialize our plugin handle
+  conv_handle = purple_conversations_get_handle();
 
   // Initialize the mapping between conversations to their encryption info
   init_conv_encryption_map();
 
   // Initialize the UI for GTK+
   init_gtk_ui(plugin);
+
+  purple_signal_connect(conv_handle, "receiving-im-msg", plugin,
+                        PURPLE_CALLBACK(SYS_incoming_cb), NULL);
+  purple_signal_connect(conv_handle, "sending-im-msg", plugin,
+                        PURPLE_CALLBACK(SYS_outgoing_cb), NULL);
   
   /* Now just return TRUE to tell libpurple to finish loading. */
   return TRUE;
@@ -53,13 +67,19 @@ static gboolean plugin_load(PurplePlugin *plugin)
 static gboolean
 plugin_unload(PurplePlugin *plugin)
 {
+  //disconnect signals on unload
+  purple_signals_disconnect_by_handle(plugin);
+
   // unload the GTK+ UI
   uninit_gtk_ui(plugin);
   
   // unload the encryption mapping
   uninit_conv_encryption_map();
   
-  // I assume this means continue unloading?
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Unloaded Successfully.\n");
+  //Return TRUE to allow the plugin to continue unloading
+  //NOTE: If "FALSE" is returned, the plugin will not be unloaded, Pidgin will
+  //display an error.  The plugin WILL be unloaded anyway when Pidgin is closed.
   return TRUE;
 }
 

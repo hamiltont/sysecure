@@ -1,3 +1,13 @@
+#ifndef GLOBALS_C
+#define GLOBALS_C
+
+#ifndef G_GNUC_NULL_TERMINATED
+# if __GNUC__ >= 4
+#  define G_GNUC_NULL_TERMINATED __attribute__((__sentinel__))
+# else
+#  define G_GNUC_NULL_TERMINATED
+# endif
+#endif
 /**
  * @file
  * @brief Holds all of the globals needed by many core files in SySecure 
@@ -29,3 +39,4 @@ void
 uninit_encryption_info(EncryptionInfo * e_info) {
   g_free(e_info);
 }
+#endif
