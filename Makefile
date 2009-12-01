@@ -20,7 +20,7 @@
 PACKAGE=sysecure
 VERSION=0.1
 
-SOURCES = sysecure.o globals.o conv_encrypt_map.o gtk_ui.o msg_handle.o
+SOURCES = sysecure.o globals.o conv_encrypt_map.o gtk_ui.o msg_handle.o pub_key.o session_keys.o
           
 PACKDIR=/tmp/pidgin-$(PACKAGE)-$(VERSION)
 
@@ -36,8 +36,8 @@ override CFLAGS += $(DEFINES)
 
 
   # *nix Compiler Stuff
-  PIDGIN_CFLAGS=$(shell pkg-config --cflags pidgin) $(shell pkg-config --cflags gtk+-2.0) $(NSS_TOP) $(NSPR_TOP) -DDATADIR=\"$(shell pkg-config --variable=datadir pidgin)\"
-  PIDGIN_LDFLAGS=$(shell pkg-config --libs pidgin) $(shell pkg-config --libs gtk+-2.0)
+  PIDGIN_CFLAGS=$(shell pkg-config --cflags pidgin) $(shell pkg-config --cflags gtk+-2.0) $(shell pkg-config --cflags nss) -DDATADIR=\"$(shell pkg-config --variable=datadir pidgin)\"
+  PIDGIN_LDFLAGS=$(shell pkg-config --libs pidgin) $(shell pkg-config --libs gtk+-2.0) $(shell pkg-config --libs nss)
   override CFLAGS += $(PIDGIN_CFLAGS) -fPIC
   override LDFLAGS += $(PIDGIN_LDFLAGS) -fPIC
   SHARED_OBJECT_SUFFIX=.so
