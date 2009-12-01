@@ -1,51 +1,32 @@
 # This Makefile is based in large off of the Makefile found in the Pidgin
 # 'albums' plugin, which is now part of the Pidgin PluginPack
 
-# If you're building on Windows, set this to 1.
-WINDOWS ?= 1
+# This Makefile is kind of awful. I had no idea what I was doing, but it finally
+# works (disclaimer, works for me, at this time, on this computer. Probably 
+# nowhere else...)
+
 
 # This is the location where the plugin will be installed. Modify this if you
 # want to install the plugin system-wide.
-ifeq ($(WINDOWS),0)
 
   # *nix Plugin Directory Settings
 
   PLUGINDIR=$(HOME)/.purple/plugins
-
-else
-
-  # Windows Plugin Directory Settings
-
-  PLUGINDIR="$(HOME)/Application Data/.purple/plugins"
-
-  # Sample system-wide plugin directory:
-  #PLUGINDIR="/cygdrive/c/Program Files/Gaim/plugins"
-
-endif
-
-# This only matters on Windows.
-GAIM_SOURCE_DIR=../gaim
-GTK_TOP=../win32-dev/gtk_2_0
+  NSS_TOP=-I/usr/include/nss -I/usr/include/nss/nss
+  NSPR_TOP=-I/usr/include/nspr -I/usr/include/nspr/nspr
 
 # DO NOT EDIT BELOW THIS LINE
 
 PACKAGE=sysecure
 VERSION=0.1
 
-SOURCES = sysecure.o globals.o conv_encrypt_map.o gtk_ui.o
+SOURCES = sysecure.o globals.o conv_encrypt_map.o gtk_ui.o msg_handle.o
           
-UI=$(PACKAGE)-ui
 PACKDIR=/tmp/pidgin-$(PACKAGE)-$(VERSION)
 
-ifeq ($(WINDOWS),0)
-	TARBALL=$(shell pwd)/../pidgin-$(PACKAGE)-$(VERSION).tar.bz2
-	ARCHIVER=tar --exclude=.cvsignore -cjf
-	ARCHIVER_END=
-else
-	TARBALL=$(shell pwd)/../pidgin-$(PACKAGE)-$(VERSION).zip
-	ARCHIVER=zip -r -9
-	ARCHIVER_END=-x pidgin-$(PACKAGE)-$(VERSION)/.cvsignore
-endif
+TARBALL=$(shell pwd)/../pidgin-$(PACKAGE)-$(VERSION).zip
+ARCHIVER=zip -r -9
+ARCHIVER_END=-x pidgin-$(PACKAGE)-$(VERSION)/.cvsignore
 
 # Common Compiler Stuff
 CC=gcc
@@ -53,48 +34,14 @@ DEFINES=-DPACKAGE=\"$(PACKAGE)\" -DVERSION=\"$(VERSION)\"
 CFLAGS ?= -g3 -O2 -Wall
 override CFLAGS += $(DEFINES)
 
-ifeq ($(WINDOWS),0)
 
   # *nix Compiler Stuff
-  PIDGIN_CFLAGS=$(shell pkg-config --cflags pidgin) $(shell pkg-config --cflags gtk+-2.0) -DDATADIR=\"$(shell pkg-config --variable=datadir pidgin)\"
+  PIDGIN_CFLAGS=$(shell pkg-config --cflags pidgin) $(shell pkg-config --cflags gtk+-2.0) $(NSS_TOP) $(NSPR_TOP) -DDATADIR=\"$(shell pkg-config --variable=datadir pidgin)\"
   PIDGIN_LDFLAGS=$(shell pkg-config --libs pidgin) $(shell pkg-config --libs gtk+-2.0)
   override CFLAGS += $(PIDGIN_CFLAGS) -fPIC
   override LDFLAGS += $(PIDGIN_LDFLAGS) -fPIC
   SHARED_OBJECT_SUFFIX=.so
 
-else
-
-  # Windows Compiler Stuff
-
-  WIN32_CFLAGS= -I"$(TOPDIR)$(GTK_TOP)/include/atk-1.0" \
-                -I"$(TOPDIR)$(GTK_TOP)/include/glib-2.0" \
-                -I"$(TOPDIR)$(GTK_TOP)/include/gtk-2.0" \
-                -I"$(TOPDIR)$(GTK_TOP)/include/freetype2" \
-                -I"$(TOPDIR)$(GTK_TOP)/include/libpng13" \
-                -I"$(TOPDIR)$(GTK_TOP)/include/pango-1.0" \
-                -I"$(TOPDIR)$(GTK_TOP)/lib/glib-2.0/include" \
-                -I"$(TOPDIR)$(GTK_TOP)/lib/gtk-2.0/include" \
-                -I"$(TOPDIR)$(GAIM_SOURCE_DIR)/libgaim" \
-                -I"$(TOPDIR)$(GAIM_SOURCE_DIR)/gtk" \
-                -I"$(TOPDIR)$(GAIM_SOURCE_DIR)/gtk/win32" \
-		-mno-cygwin -mms-bitfields \
-                $(CFLAGS)
-
-  WIN32_LIBS=   -lgtk-win32-2.0 \
-                -lglib-2.0 \
-                -lgdk-win32-2.0 \
-                -lgobject-2.0 \
-                -lgmodule-2.0 \
-                -lgdk_pixbuf-2.0 \
-                -lpango-1.0 \
-                -lintl \
-                -lws2_32 \
-                -lgtkgaim \
-                -lgaim
-
-  SHARED_OBJECT_SUFFIX=.dll
-
-endif
 
 all: build
 build: $(PACKAGE)$(SHARED_OBJECT_SUFFIX)	# Builds all components of the package
@@ -127,10 +74,5 @@ help:			# Displays usage information
 
 $(PACKAGE).so: $(PACKAGE).o $(SOURCES)
 	$(LINK.o) --shared $^ $(LOADLIBES) $(LDLIBS) -o $@
-
-$(PACKAGE).dll: $(PACKAGE).c $(UI).c
-	$(CC) $(WIN32_CFLAGS) -o $(PACKAGE).o -c $(PACKAGE).c
-	$(CC) $(WIN32_CFLAGS) -o $(UI).o -c $(UI).c
-	$(CC) -shared $(PACKAGE).o $(UI).o -L"$(TOPDIR)$(GTK_TOP)/lib" -L"$(TOPDIR)$(GAIM_SOURCE_DIR)/libgaim" -L"$(TOPDIR)$(GAIM_SOURCE_DIR)/gtk" $(WIN32_LIBS) $(DLL_LD_FLAGS) -o $@
 
 .PHONY: all build rebuild package install clean distclean help
