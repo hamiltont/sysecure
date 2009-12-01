@@ -38,8 +38,8 @@ PACKAGE=sysecure
 VERSION=0.1
 
 SOURCES = sysecure.o globals.o conv_encrypt_map.o gtk_ui.o
-SOURCES_O = globals.o conv_encrypt_map.o gtk_ui.o msg_handle.o
-SOURCES_C = globals.c conv_encrypt_map.c gtk_ui.c msg_handle.c
+SOURCES_O = globals.o conv_encrypt_map.o gtk_ui.o msg_handle.o pub_key.o
+SOURCES_C = globals.c conv_encrypt_map.c gtk_ui.c msg_handle.c pub_key.c
           
 #UI=$(PACKAGE)-ui
 PACKDIR=/tmp/pidgin-$(PACKAGE)-$(VERSION)
@@ -158,6 +158,9 @@ gtk_ui.o : gtk_ui.c gtk_ui.h
 
 msg_handle.o : msg_handle.c msg_handle.h
 	$(CC) $(WIN32_CFLAGS) -o msg_handle.o -c msg_handle.c
+
+pub_key.o : pub_key.c pub_key.h
+	$(CC) $(WIN32_CFLAGS) -o pub_key.o -c pub_key.c
 
 $(PACKAGE).dll: $(PACKAGE).c $(SOURCES_C)
 	$(CC) $(WIN32_CFLAGS) -o $(PACKAGE).o -c $(PACKAGE).c
