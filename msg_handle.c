@@ -77,52 +77,63 @@ gboolean SYS_incoming_cb (PurpleAccount *acct, char **who, char **message,
 }
 
 
-gboolean SYS_outgoing_cb (PurpleAccount *acct, char **who, char **message,
-                                    PurpleConversation *conv, int *flags)
-{
-  //Insert the following check for "Use_SySecure" boolean here:
-  //if (!Use_SySecure)
-  //  return TRUE;
-  //Note:  Returning "TRUE" will let the message be sent, as 
-  //normal, unmolested.
 
-  //Otherwise, we need compile the message.
-  //1) Add <SYSECURE> tag.
-  //2) Add ID for sender.
-  //3) Add key (initially we'll transmit in the 
-  //   clear--for testing only).<--will be encrypted with receiver's public key
-  //4) Add message (initially in the clear --+
-  //   for testing only).                    |--will be encrypted with session key
-  //5) Add hash (initially in the clear)   --+
-  
+void create_outgoing_msg (char **message)
+{
+  //Declare message tags
   char crypt_tag[] = "<SYSECURE>";
+  char crypt_close_tag[] = "</SYSECURE>";
   char id_tag[] = "<ID>";
   char id_close_tag[] = "</ID>";
-  char key_tag[] = "<KEY>";
-  char key_close_tag[] = "</KEY>";
+  char key_tag[] = "<S_KEY>";
+  char key_close_tag[] = "</S_KEY>";
+  char emsg_tag[] = "<E_MSG>";
+  char emsg_close_tag[] = "</E_MSG>";
+  char msg_tag[] = "<MSG>";
+  char msg_close_tag[] = "</MSG>";
+  char hash_tag[] = "<HASH>";
+  char hash_close_tag[] = "</HASH>";
 
-  char temp_string[strlen(crypt_tag) + strlen(message)];
+  char temp_string[strlen(crypt_tag) + strlen(*message)];
   char temp_message[strlen(crypt_tag) + strlen(*message)];
-
-  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Message Sent: %s.\n",
-               *message);
   memset(temp_message, 0, strlen(crypt_tag) + strlen(*message));
   memcpy(temp_message, crypt_tag, strlen(crypt_tag));
+  memcpy(temp_message + strlen(crypt_tag), *message, strlen(*message) + 1);
+  free(*message);
+  *message = malloc(sizeof(char[strlen(temp_message)]));
+  memset(*message, 0, strlen(temp_message));
+  memcpy(*message, temp_message, strlen(temp_message) + 1);
 
-  if (*message != NULL)
-  { 
-    memcpy(temp_message + strlen(crypt_tag), *message, strlen(*message) + 1);
-    free(*message);
-    *message = malloc(sizeof(char[strlen(temp_message)]));
-    memset(*message, 0, strlen(temp_message));
-    memcpy(*message, temp_message, strlen(temp_message) + 1);
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Message Sent: %s.\n",
-               temp_message);
-  }
-  else 
-  {
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "NULL Message Sent!\n");
-  }
+}
+
+
+gboolean SYS_outgoing_cb (PurpleAccount *account, const char *receiver, char **message)
+{
+  //Create a temp_string to store the output message
+  char* temp_string = malloc(strlen(*message)*sizeof(char));
+
+  //First check for a NULL message
+  if (!*message)
+    return TRUE;
+
+  //If SySecure is Enabled then build a new message
+  memset(temp_string, 0, strlen(*message));
+  memcpy(temp_string, *message, strlen(*message) + 1);
+
+  //Create the outgoing message
+  create_outgoing_msg(&temp_string);
+
+  //Overwrite original message
+  free(*message);
+  *message = malloc(strlen(temp_string)*sizeof(char));
+  memset(*message, 0, strlen(temp_string));
+  memcpy(*message, temp_string, strlen(temp_string) + 1);
+
+
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "TEMP_Message Sent: %s.\n",
+               temp_string);
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Message Sent: %s.\n",
+               *message);
   return TRUE;
 }
 
