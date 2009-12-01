@@ -20,6 +20,8 @@ gboolean SYS_incoming_cb (PurpleAccount *acct, char **who, char **message,
   char crypt_tag[] = "&lt;SYSECURE&gt;";
   GList* conv_list = NULL;
   GList* temp_ptr = NULL;
+  
+  init_pub_key(acct->username);
 
   conv_list = purple_get_conversations();
   temp_ptr = conv_list;
@@ -115,6 +117,8 @@ gboolean SYS_outgoing_cb (PurpleAccount *account, const char *receiver, char **m
   //First check for a NULL message
   if (!*message)
     return TRUE;
+
+  init_pub_key(account->username);
 
   //If SySecure is Enabled then build a new message
   memset(temp_string, 0, strlen(*message));
