@@ -24,12 +24,14 @@ typedef struct {
   SECKEYPublicKey* pub;
 } RSA_Key_Pair;
 
-void find_pub_key (char * key_val, GList** temp_ptr);
+void find_key_pair (char * key_val, GList** temp_ptr);
 
 void generate_RSA_Key_Pair (RSA_Key_Pair** temp_key);
 
 void init_pub_key (char* name);
 
 gboolean nss_init (void);
+
+void generate_pubkeystring (SECKEYPublicKey* pub, char **temp_string);
 
 #endif //PUB_KEY_H

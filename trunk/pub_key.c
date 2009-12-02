@@ -15,8 +15,10 @@
 //INCLUDING the user's.
 GList* SYS_key_ring = NULL;
 
-//Given a name, this returns a public key
-void find_pub_key (char * key_val, GList** temp_ptr)
+//Given a name and a reference to a GList pointer,
+//sets the pointer to the node with the key-pair
+//identified by key_val.
+void find_key_pair (char * key_val, GList** temp_ptr)
 {
   *temp_ptr = SYS_key_ring;
   RSA_Key_Pair* temp_key;
@@ -53,7 +55,7 @@ void generate_RSA_Key_Pair (RSA_Key_Pair** temp_key)
   PK11SlotInfo *slot = 0;
   PK11RSAGenParams rsaParams;
   rsaParams.keySizeInBits = 1024;
-  rsaParams.pe = 65537;
+  rsaParams.pe = 65537L;
   *temp_key = malloc (sizeof(RSA_Key_Pair));
   slot = PK11_GetInternalKeySlot();
 
@@ -69,6 +71,7 @@ void generate_RSA_Key_Pair (RSA_Key_Pair** temp_key)
 
 void init_pub_key (char* key_val)
 {
+  char *key_string;
   RSA_Key_Pair *temp_key;
   GList* temp_ptr;
 
@@ -78,7 +81,7 @@ void init_pub_key (char* key_val)
   //if key exists, temp_ptr will point to it
   //otherwise it will be NULL and the key will
   //have to be created.
-  find_pub_key(key_val, &temp_ptr);
+  find_key_pair(key_val, &temp_ptr);
   if (temp_ptr == NULL)
   {
     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "No key exists for %s...generating new one...\n", key_val);
@@ -93,6 +96,10 @@ void init_pub_key (char* key_val)
   else
   {
     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Key exists for %s.\n", key_val);
+    temp_key = (RSA_Key_Pair*)(temp_ptr->data);
+    generate_pubkeystring(temp_key->pub, &key_string);
+    if (key_string != NULL)
+      purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Key Value is %s.\n", key_string);
   }
 }
 
@@ -112,6 +119,18 @@ gboolean nss_init (void)
     purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "NSS is not intitialized.\n");
     return FALSE;
   }
+}
+
+void generate_pubkeystring (SECKEYPublicKey* pub, char **temp_string)
+{
+  SECItem *key_item;
+  if (!pub)
+  {
+    *temp_string = NULL;
+    return;
+  }
+  key_item = SECKEY_EncodeDERSubjectPublicKeyInfo(pub);
+  *temp_string = NSSBase64_EncodeItem(0, 0, 0, key_item);
 }
 
 #endif //PUB_KEY_C
