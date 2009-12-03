@@ -138,7 +138,7 @@ debug_session_cb(GtkWidget *widget, gboolean data)
   //debug_symmetric_key(generate_symmetric_key());
   
   unsigned char strdata[1024];
-  strcpy(strdata, "Encrypt me!");
+  strcpy(strdata, "Encrypt some text!");
   
   encrypt(generate_symmetric_key(), &strdata);
   
