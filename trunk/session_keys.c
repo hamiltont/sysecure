@@ -20,8 +20,12 @@
 PK11SymKey *
 generate_symmetric_key()
 {
-  CK_MECHANISM_TYPE keygenMech = CKM_DES_CBC_PAD;
-  
+  // We want AES encryption
+  // AES is a block cipher, so if the input is not a multiple of the block size
+  // then someone has to pad the input with some extra data. We add _PAD to 
+  // inform NSS that it should handle this padding for us, we don't want to 
+  // manage it ourself
+  CK_MECHANISM_TYPE keygenMech = CKM_AES_CBC_PAD;
   
   PK11SymKey* sym_key = PK11_KeyGen(PK11_GetInternalKeySlot(),
                                     keygenMech, 
@@ -92,8 +96,8 @@ encrypt(PK11SymKey *key, unsigned char * plain)
                               outbuf, 
                               &outlen, 
                               sizeof(outbuf), 
-                              data,
-                              strlen(data) + 1);
+                              plain,
+                              strlen(plain) + 1);
   
   PK11_DigestFinal(EncContext,
                    outbuf+outlen, 
