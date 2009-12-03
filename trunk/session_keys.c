@@ -1,6 +1,9 @@
 #ifndef SESSION_KEYS_C
 #define SESSION_KEYS_C
 
+// General Includes
+#include <string.h>
+
 // NSS includes
 #include "nss.h"
 #include "pk11pub.h"
@@ -17,7 +20,7 @@
 PK11SymKey *
 generate_symmetric_key()
 {
-  CK_MECHANISM_TYPE keygenMech = CKM_AES_KEY_GEN;
+  CK_MECHANISM_TYPE keygenMech = CKM_DES_CBC_PAD;
   
   
   PK11SymKey* sym_key = PK11_KeyGen(PK11_GetInternalKeySlot(),
@@ -36,7 +39,7 @@ debug_symmetric_key(PK11SymKey * key)
                     "Debugging session key\n");
   
   purple_debug_info(PLUGIN_ID,
-                    "Type: %i\n",
+                    "Type: 0x%x\n",
                     PK11_GetMechanism(key));
                     
   purple_debug_info(PLUGIN_ID,
@@ -45,5 +48,97 @@ debug_symmetric_key(PK11SymKey * key)
   
 }
 
+void 
+encrypt(PK11SymKey *key, unsigned char * plain)
+{
+  
+  SECItem ivItem;
+  
+  unsigned char data[1024];
+  unsigned char gIV[] = {0xe4, 0xbb, 0x3b, 0xd3, 0xc3, 0x71, 0x2e, 0x58};
+  
+  ivItem.type = siBuffer;
+  ivItem.data = gIV;
+  ivItem.len = sizeof(gIV);
+  SECItem *param = PK11_ParamFromIV(PK11_GetMechanism(key), &ivItem);
+  
+   if (param == NULL)
+  {
+    fprintf(stderr, "Failure to set up PKCS11 param (err %d)\n",
+            PR_GetError());
+  }
+  
+  strcpy(data, "Encrypt me!");
+  fprintf(stderr, "Clear Data: %s\n", data);
+  
+  PK11Context* EncContext = PK11_CreateContextBySymKey(PK11_GetMechanism(key), 
+                                                       CKA_ENCRYPT, 
+                                                       key, 
+                                                       param);
+  
+  //purple_debug_info(PLUGIN_ID,"Encrypting %s",plain);
+  
+  // Allocate and zero our output buffer
+  int out_buf_size = (strlen(plain) * sizeof(char))
+                   + PK11_GetBlockSize(PK11_GetMechanism(key),param);           
+  unsigned char outbuf[1024];
+                                         
+  //memset(&outbuf,0,out_buf_size);
+  
+  int outlen = 0;
+  int outlen2 = 0;
+    
+  SECStatus s = PK11_CipherOp(EncContext,
+                              outbuf, 
+                              &outlen, 
+                              sizeof(outbuf), 
+                              data,
+                              strlen(data) + 1);
+  
+  PK11_DigestFinal(EncContext,
+                   outbuf+outlen, 
+                   &outlen2, 
+                   sizeof(outbuf) - outlen);
+  
+  
+  PK11_DestroyContext(EncContext, PR_TRUE);
+  
+  fprintf(stderr, "Encrypted Data: \n");
+  int result_len = outlen + outlen2;
+  fprintf(stderr, "Data length %i \n",result_len);
+  int i;
+  
+  for (i=0; i<result_len; i++)
+    fprintf(stderr, "%02x ", outbuf[i]);
+  fprintf(stderr, "\n");
+  
+  unsigned char dec_buf[1024];
+  outlen = outlen2 = 0;
+  
+  EncContext = PK11_CreateContextBySymKey(PK11_GetMechanism(key), 
+                                                       CKA_DECRYPT, 
+                                                       key, 
+                                                       param);
+  
+  PK11_CipherOp(EncContext,
+                dec_buf, 
+                &outlen, 
+                sizeof(dec_buf), 
+                outbuf,
+                result_len);
+  
+  PK11_DigestFinal(EncContext,
+                   dec_buf+outlen, 
+                   &outlen2, 
+                   result_len - outlen);
+  
+  
+  PK11_DestroyContext(EncContext, PR_TRUE);
+  
+  result_len = outlen + outlen2;
+  
+  fprintf(stderr, "Decrypted Data: %s\n", dec_buf);
+  
+}
 
 #endif

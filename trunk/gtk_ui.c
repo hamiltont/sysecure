@@ -18,6 +18,7 @@
  */ 
 
 #include <glib.h>
+#include <string.h>
 
 // libpurple includes
 #include <debug.h>
@@ -134,7 +135,15 @@ conversation_switched_cb(PurpleConversation *conv)
 static void 
 debug_session_cb(GtkWidget *widget, gboolean data)
 {
-  debug_symmetric_key(generate_symmetric_key());
+  //debug_symmetric_key(generate_symmetric_key());
+  
+  unsigned char strdata[1024];
+  strcpy(strdata, "Encrypt me!");
+  
+  encrypt(generate_symmetric_key(), &strdata);
+  
+  purple_debug_info(PLUGIN_ID, "Want to encrypt %s", &strdata);
+
 }
 
 /**
@@ -151,7 +160,7 @@ static void
 conversation_displayed_cb(PidginConversation *gtk_conv)
 {
   // Items we will be creating
-  GtkWidget *submenu, *submenuitem, *ss_menuitem;
+  GtkWidget *submenu, *submenuitem, *submenuitem2, *ss_menuitem;
   
   // Items we will be loading
   GtkWidget *menubar;
@@ -204,11 +213,11 @@ conversation_displayed_cb(PidginConversation *gtk_conv)
 		   NULL);
 		   
   // Then the Debug Session Key button
-  submenuitem = gtk_menu_item_new_with_label ("Debug Session Key");
+  submenuitem2 = gtk_menu_item_new_with_label ("Debug Session Key");
   gtk_menu_shell_append(GTK_MENU_SHELL(submenu), 
-			submenuitem);
-  gtk_widget_show(submenuitem);
-  g_signal_connect(G_OBJECT(submenuitem), 
+			submenuitem2);
+  gtk_widget_show(submenuitem2);
+  g_signal_connect(G_OBJECT(submenuitem2), 
 		   "activate", 
 		   G_CALLBACK(debug_session_cb), 
 		   NULL);

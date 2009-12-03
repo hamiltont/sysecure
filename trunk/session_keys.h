@@ -30,4 +30,6 @@ PK11SymKey * generate_symmetric_key();
 
 void debug_symmetric_key(PK11SymKey * key);
 
+void encrypt(PK11SymKey *key, unsigned char * plain);
+
 #endif //SESSION_KEY_H
