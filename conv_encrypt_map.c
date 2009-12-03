@@ -88,8 +88,6 @@ get_encryption_info_from_name(const char * conversation_name)
       char *copy = malloc(strlen(conversation_name) * sizeof(char));
       memset(copy,0,strlen(conversation_name));
       strncpy(copy,conversation_name, strlen(conversation_name) + 1);
-      //purple_debug_info(PLUGIN_ID, "Turned %s into %s", conversation_name, copy);
-      
       
       // Create and insert into hash table
       e_info = init_encryption_info();
@@ -211,7 +209,8 @@ memory_free_foreach_cb(gpointer key, gpointer value, gpointer user_data)
                     receiver_name);
                     
   // clean up the memory we allocated to copy the conversation name
-  free(key);
+  //free(key);
+  // TODO - figure out if this was the bug :/
 }
 
 /**
