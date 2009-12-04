@@ -139,8 +139,16 @@ debug_session_cb(GtkWidget *widget, gboolean data)
   
   unsigned char strdata[1024];
   strcpy(strdata, "Encrypt some text!");
+  int outlen = 0;
+
+  unsigned char * cipher = encrypt(generate_symmetric_key(), &strdata, &outlen);
   
-  encrypt(generate_symmetric_key(), &strdata);
+  fprintf(stderr, "Encrypted Data: \n");
+  fprintf(stderr, "Data length %i \n",outlen);
+  int i;
+  for (i=0; i<outlen; i++)
+    fprintf(stderr, "%02x ", cipher[i]);
+  fprintf(stderr, "\n");
   
   purple_debug_info(PLUGIN_ID, "Want to encrypt %s", &strdata);
 
