@@ -198,11 +198,10 @@ gboolean pub_key_encrypt (char **enc_msg, char **orig_msg, char *key_val)
 
   //Get the modulus length from the key
   modulus_length = SECKEY_PublicKeyStrength(key);
-  //unpadded_block_len = oaep_max_unpadded_len(modulus_length);
+  unpadded_block_len = oaep_max_unpadded_len(modulus_length);
 
   //Determine the total number of blocks needed
-  num_blocks = 1;
-//((strlen(*orig_msg) - 1)/unpadded_block_len) + 1;
+  num_blocks = ((strlen(*orig_msg) - 1)/unpadded_block_len) + 1;
 
   padded_block = malloc(modulus_length);
   *enc_msg = malloc(modulus_length * num_blocks);
@@ -215,9 +214,61 @@ gboolean pub_key_encrypt (char **enc_msg, char **orig_msg, char *key_val)
 
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "ENC_MSG: %s, ORIG_MSG: %s, DECRYPT: %s\n", *enc_msg, *orig_msg, decrypted);
 
-  //purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Mod_length: %d Unpadded_Blk_Len: %d Num_Block: %d Orig_Msg: %s.\n", modulus_length,
-  //              unpadded_block_len, num_blocks, *orig_msg);
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Mod_length: %d Unpadded_Blk_Len: %d Num_Block: %d Orig_Msg: %s.\n", modulus_length,
+                unpadded_block_len, num_blocks, *orig_msg);
   return TRUE;
+}
+
+gboolean wrap_symkey (PK11SymKey *key, SECItem **key_data, char* name)
+{
+  int rv = 0;
+  SECItem *data;
+  SECStatus s;
+  GList *temp_ptr;
+  RSA_Key_Pair *key_pair;
+  find_key_pair(name, &temp_ptr);
+  if (temp_ptr == NULL)
+  {
+    purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "wrap_symkey: Key for %s not found.", name);
+    return FALSE;
+  }
+  key_pair = (RSA_Key_Pair*)temp_ptr->data;
+  data = (SECItem *) malloc(sizeof(SECItem));
+  data->len = SECKEY_PublicKeyStrength(key_pair->pub);
+  data->data = malloc(data->len * sizeof(char));
+  s = PK11_PubWrapSymKey(CKM_RSA_PKCS, key_pair->pub, key, data);
+  *key_data = data;
+  return TRUE;
+}
+
+gboolean unwrap_symkey (SECItem *wrappedKey, char* name, PK11SymKey **unwrapped_key)
+{
+  GList *temp_ptr;
+  RSA_Key_Pair *key_pair;
+  find_key_pair(name, &temp_ptr);
+  if (temp_ptr == NULL)
+  {
+    purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "unwrap_symkey: Key pair for %s not found.", name);
+    return FALSE;
+  }
+  key_pair = (RSA_Key_Pair*) temp_ptr->data;
+  if (key_pair->priv == NULL)
+  {
+    purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "unwrap_symkey: Privat Key for %s not found.", name);
+    return FALSE;
+  }
+
+  *unwrapped_key = PK11_PubUnwrapSymKey(key_pair->priv, wrappedKey, CKM_AES_CBC_PAD, CKA_ENCRYPT, 0);
+  return TRUE;
+}
+
+PRBool compare_symkeys (PK11SymKey *key1, PK11SymKey *key2)
+{
+  SECItem *raw_key1 = 0;
+  SECItem *raw_key2 = 0;
+  raw_key1 = PK11_GetKeyData(key1);
+  raw_key2 = PK11_GetKeyData(key2);
+  return SECITEM_ItemsAreEqual(raw_key1, raw_key2);
 }
 
 #endif //PUB_KEY_C

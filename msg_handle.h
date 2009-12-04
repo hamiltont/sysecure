@@ -57,9 +57,15 @@
 #include "stdlib.h"
 #include "string.h"
 
+// NSS includes
+#include "nss.h"
+#include "pk11pub.h"
+#include "pk11func.h"
+
 //SYSECURE includes:
 #include "conv_encrypt_map.h"
 #include "pub_key.h"
+#include "session_keys.h"
 
 char* SYS_tag_check (char *message, char *tag);
 
