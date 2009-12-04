@@ -38,8 +38,8 @@ PACKAGE=sysecure
 VERSION=0.1
 #nss_oaep.o nss_mgf1.o
 SOURCES = sysecure.o globals.o conv_encrypt_map.o gtk_ui.o
-SOURCES_O = globals.o conv_encrypt_map.o gtk_ui.o msg_handle.o pub_key.o session_keys.o
-SOURCES_C = globals.c conv_encrypt_map.c gtk_ui.c msg_handle.c pub_key.c session_keys.c
+SOURCES_O = globals.o conv_encrypt_map.o gtk_ui.o msg_handle.o pub_key.o session_keys.o nss_oaep.o nss_mgf1.o
+SOURCES_C = globals.c conv_encrypt_map.c gtk_ui.c msg_handle.c pub_key.c session_keys.c nss_oaep.c nss_mgf1.c
           
 #UI=$(PACKAGE)-ui
 PACKDIR=/tmp/pidgin-$(PACKAGE)-$(VERSION)
@@ -161,11 +161,11 @@ conv_encrypt_map.o : conv_encrypt_map.c conv_encrypt_map.h
 gtk_ui.o : gtk_ui.c gtk_ui.h
 	$(CC) $(WIN32_CFLAGS) -o gtk_ui.o -c gtk_ui.c
 
-#nss_mgf1.o : nss_mgf1.c nss_mgf1.h
-#	$(CC) $(WIN32_CFLAGS) -o nss_mgf1.o -c nss_mgf1.c
+nss_mgf1.o : nss_mgf1.c nss_mgf1.h
+	$(CC) $(WIN32_CFLAGS) -o nss_mgf1.o -c nss_mgf1.c
 
-#nss_oaep.o : nss_oaep.c nss_oaep.h
-#	$(CC) $(WIN32_CFLAGS) -o nss_oaep.o -c nss_oaep.c
+nss_oaep.o : nss_oaep.c nss_oaep.h
+	$(CC) $(WIN32_CFLAGS) -o nss_oaep.o -c nss_oaep.c
 
 msg_handle.o : msg_handle.c msg_handle.h
 	$(CC) $(WIN32_CFLAGS) -o msg_handle.o -c msg_handle.c

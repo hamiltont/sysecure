@@ -114,6 +114,12 @@ gboolean SYS_outgoing_cb (PurpleAccount *account, const char *receiver, char **m
   //Create a temp_string to store the output message
   char* temp_string = malloc(strlen(*message)*sizeof(char));
   char* enc_msg;
+  PK11SymKey *key;
+  PK11SymKey *test_key;
+  int key_length;
+  SECItem* key_data;
+  char* key_buff;
+  PRBool compare_check = FALSE;
 
   //First check for a NULL message
   if (!*message)
@@ -134,7 +140,21 @@ gboolean SYS_outgoing_cb (PurpleAccount *account, const char *receiver, char **m
   memset(*message, 0, strlen(temp_string));
   memcpy(*message, temp_string, strlen(temp_string) + 1);
 
-  pub_key_encrypt(&enc_msg, &(*message), account->username);
+  key = generate_symmetric_key();
+  key_length = PK11_GetKeyLength(key);
+
+  wrap_symkey(key, &key_data, account->username);
+  unwrap_symkey(key_data, account->username, &test_key);
+  compare_check = compare_symkeys (key, test_key);
+  if (compare_check)
+    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Key generated and wrapped and unwrapped successfully.\n");
+  else
+   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Key generated but failed wrap/unwrap comparison.\n");
+  //key_data = PK11_GetKeyData(key);
+  key_buff = NSSBase64_EncodeItem(0, 0, 0, key_data);
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Key generated and wrapped.  Length: %d Key_buff: %s\n", key_length, key_buff);
+
+  //pub_key_encrypt(&enc_msg, &(*message), account->username);
 
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "TEMP_Message Sent: %s.\n",
                temp_string);

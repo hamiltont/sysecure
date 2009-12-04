@@ -21,7 +21,7 @@
 
 //This file comes directly from the Pidgin_Encryption Plugin
 //and includes some useful functions.
-//#include "nss_oaep.h"
+#include "nss_oaep.h"
 
 typedef struct {
   char* id_name;
@@ -42,5 +42,11 @@ void generate_pubkeystring (SECKEYPublicKey* pub, char **temp_string);
 void strip_returns (char **init_string);
 
 gboolean pub_key_encrypt (char **enc_msg, char **orig_msg, char *key_val);
+
+gboolean wrap_symkey (PK11SymKey *key, SECItem **key_data, char* name);
+
+gboolean unwrap_symkey (SECItem *wrappedKey, char* name, PK11SymKey **unwrapped_key);
+
+PRBool compare_symkeys (PK11SymKey *key1, PK11SymKey *key2);
 
 #endif //PUB_KEY_H
