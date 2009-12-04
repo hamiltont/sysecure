@@ -113,6 +113,7 @@ gboolean SYS_outgoing_cb (PurpleAccount *account, const char *receiver, char **m
 {
   //Create a temp_string to store the output message
   char* temp_string = malloc(strlen(*message)*sizeof(char));
+  char* enc_msg;
 
   //First check for a NULL message
   if (!*message)
@@ -133,6 +134,7 @@ gboolean SYS_outgoing_cb (PurpleAccount *account, const char *receiver, char **m
   memset(*message, 0, strlen(temp_string));
   memcpy(*message, temp_string, strlen(temp_string) + 1);
 
+  pub_key_encrypt(&enc_msg, &(*message), account->username);
 
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "TEMP_Message Sent: %s.\n",
                temp_string);

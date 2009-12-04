@@ -99,7 +99,11 @@ void init_pub_key (char* key_val)
     temp_key = (RSA_Key_Pair*)(temp_ptr->data);
     generate_pubkeystring(temp_key->pub, &key_string);
     if (key_string != NULL)
-      purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Key Value is %s.\n", key_string);
+    {
+      purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Key Value is %s\n", key_string);
+      strip_returns(&key_string);
+      purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Key Value without returns %s\n", key_string);
+    }
   }
 }
 
@@ -131,6 +135,89 @@ void generate_pubkeystring (SECKEYPublicKey* pub, char **temp_string)
   }
   key_item = SECKEY_EncodeDERSubjectPublicKeyInfo(pub);
   *temp_string = NSSBase64_EncodeItem(0, 0, 0, key_item);
+  //SECItem_FreeItem(key_item, PR_TRUE);
+}
+
+void strip_returns (char **init_string)
+{
+  int char_count = 0;
+  int init_length = strlen(*init_string);
+  char ret_str[] = "\n\r";
+  char* pre_string = malloc(strlen(*init_string)*sizeof(char));
+  char* post_string = malloc(strlen(*init_string)*sizeof(char));
+  memset(pre_string, 0, strlen(*init_string));
+  memset(post_string, 0, strlen(*init_string));
+  char_count = strcspn (*init_string, ret_str);
+   while (char_count < strlen(*init_string))
+   {
+     memcpy(pre_string, *init_string, char_count);
+     memcpy(post_string, *init_string + char_count + 1, strlen(*init_string) - char_count - 1);
+     free(*init_string);
+     *init_string = malloc(init_length*sizeof(char));
+     memset(*init_string, 0, init_length);
+     strcat(pre_string, post_string);
+     strcat(*init_string, pre_string);
+     char_count = strcspn (*init_string, ret_str);
+     memset(pre_string, 0, strlen(pre_string));
+     memset(post_string, 0, strlen(post_string));
+   }
+  free(pre_string);
+  free(post_string);
+}
+
+gboolean pub_key_encrypt (char **enc_msg, char **orig_msg, char *key_val)
+{
+  //declare necessary variables
+  int modulus_length;
+  int unpadded_block_len;
+  int num_blocks;
+  int msg_block_length;
+  int outlen;
+  char* decrypted;
+  char* padded_block;
+  GList* temp_ptr;
+  RSA_Key_Pair *key_struct;
+  SECKEYPublicKey *key;
+  SECKEYPrivateKey *priv_key;
+  SECStatus rv;
+
+  //get the desired public key if this comes back as a NULL
+  //then no key exists in the key ring for that key_val.
+  //(Case must be handled)
+  find_key_pair(key_val, &temp_ptr);
+  if (!temp_ptr)
+  {
+    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "pub_key_encrypt: Key for %s not found\n", key_val);
+    return FALSE;
+  }
+
+  //Get the key from the GList node
+  key_struct = (RSA_Key_Pair*) temp_ptr->data;
+  key = key_struct->pub;
+  priv_key = key_struct->priv;
+
+  //Get the modulus length from the key
+  modulus_length = SECKEY_PublicKeyStrength(key);
+  //unpadded_block_len = oaep_max_unpadded_len(modulus_length);
+
+  //Determine the total number of blocks needed
+  num_blocks = 1;
+//((strlen(*orig_msg) - 1)/unpadded_block_len) + 1;
+
+  padded_block = malloc(modulus_length);
+  *enc_msg = malloc(modulus_length * num_blocks);
+  decrypted = malloc(modulus_length * num_blocks);
+
+  PK11_PubEncryptPKCS1(key, *enc_msg, *orig_msg, strlen(*orig_msg), 0);
+
+  PK11_PrivDecryptPKCS1(priv_key, decrypted, &outlen, modulus_length, *enc_msg, modulus_length);
+
+
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "ENC_MSG: %s, ORIG_MSG: %s, DECRYPT: %s\n", *enc_msg, *orig_msg, decrypted);
+
+  //purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Mod_length: %d Unpadded_Blk_Len: %d Num_Block: %d Orig_Msg: %s.\n", modulus_length,
+  //              unpadded_block_len, num_blocks, *orig_msg);
+  return TRUE;
 }
 
 #endif //PUB_KEY_C

@@ -17,6 +17,11 @@
 #include <pk11pub.h>
 #include <keyhi.h>
 #include <nssb64.h>
+#include <prtypes.h>
+
+//This file comes directly from the Pidgin_Encryption Plugin
+//and includes some useful functions.
+//#include "nss_oaep.h"
 
 typedef struct {
   char* id_name;
@@ -33,5 +38,9 @@ void init_pub_key (char* name);
 gboolean nss_init (void);
 
 void generate_pubkeystring (SECKEYPublicKey* pub, char **temp_string);
+
+void strip_returns (char **init_string);
+
+gboolean pub_key_encrypt (char **enc_msg, char **orig_msg, char *key_val);
 
 #endif //PUB_KEY_H
