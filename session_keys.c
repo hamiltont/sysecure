@@ -3,6 +3,7 @@
 
 // General Includes
 #include <string.h>
+#include <stdlib.h>
 
 // NSS includes
 #include "nss.h"
@@ -117,8 +118,8 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
   out_buf_size = out_buf_size + PK11_GetBlockSize(PK11_GetMechanism(key),param);           
   
   // First line works, second does not!
-  unsigned char outbuf[out_buf_size];   // TODO - this is allocating too much!
-  // unsigned char *outbuf = (unsigned char *) malloc(out_buf_size);
+  //unsigned char outbuf[out_buf_size];   // TODO - this is allocating too much!
+  unsigned char *outbuf = malloc(1024);
   
                                          
   // Used to store the size that encrypted output takes up. If too much buffer
