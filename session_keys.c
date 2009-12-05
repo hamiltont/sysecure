@@ -68,8 +68,11 @@ debug_symmetric_key(PK11SymKey * key)
  * @param plain The initial raw data. 
  * @param result_length An output variable. Pass in any random integer, and upon
  *                      return it will be set to the length of the output 
- *                       
+ * 
+ * @return A newly allocated array, which contains the encrypted data. Length
+ *         of encrypted data is stored to result_length                      
  */
+// TODO - add better names to some of the internal methods 
 unsigned char * 
 encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
 {
@@ -112,15 +115,19 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
   
   // We are using a block cipher, so our output buffer needs to be
   // (1) at least as big as the input text
-  int out_buf_size = strlen(plain) * sizeof(unsigned char);
+  int out_buf_size = strlen(plain) * sizeof(char);
   // (2) plus one extra block, in case the input had to be padded to complete
   //     filling the last block
   out_buf_size = out_buf_size + PK11_GetBlockSize(PK11_GetMechanism(key),param);           
   
-  // First line works, second does not!
-  //unsigned char outbuf[out_buf_size];   // TODO - this is allocating too much!
-  unsigned char *outbuf = malloc(1024);
+  unsigned char *outbuf = malloc(out_buf_size);
   
+  if (outbuf == NULL)
+  {
+    purple_debug_error(PLUGIN_ID,
+                       "Unable to allocate memory to store the encrypted message!");
+    return NULL;
+  }
                                          
   // Used to store the size that encrypted output takes up. If too much buffer
   // was allocated, it may not all be used. This param tells you exactly how
@@ -131,7 +138,7 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
   SECStatus cipher_status = PK11_CipherOp(EncContext,         // Context, useful for chaining operations
                               outbuf,             // Buf to store result     
                               &outlen,            // Out param - turns into the length of the result
-                              sizeof(outbuf),     // The max size the output
+                              out_buf_size,       // The max size the output 
                               plain,              // Input data
                               strlen(plain) + 1); // Input data length (amount to encrypt)
   
