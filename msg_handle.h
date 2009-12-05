@@ -61,11 +61,15 @@
 #include "nss.h"
 #include "pk11pub.h"
 #include "pk11func.h"
+#include "nssb64.h"
+#include "base64.h"
 
 //SYSECURE includes:
 #include "conv_encrypt_map.h"
 #include "pub_key.h"
 #include "session_keys.h"
+
+gboolean SYS_enabled_check (char *id);
 
 char* SYS_tag_check (char *message, char *tag);
 
