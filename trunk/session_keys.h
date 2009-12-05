@@ -33,6 +33,8 @@ void debug_symmetric_key(PK11SymKey * key);
 unsigned char * 
 encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length);
 
-char * decrypt(PK11SymKey *key, unsigned char * cipher, unsigned int length);
+unsigned char * 
+decrypt(PK11SymKey *key, unsigned char * cipher, unsigned int cipher_length,
+        unsigned int * result_length);
 
 #endif //SESSION_KEY_H
