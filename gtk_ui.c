@@ -36,6 +36,10 @@
 // Used to debug the session stuff
 #include "session_keys.h"
 
+// Needed as long as this file references PK11SymKey. This should only be 
+// here while sysecure has debug options on the menu
+#include "pk11pub.h"
+
 #include "gtk_ui.h"
 
 static GtkWidget * encryption_menuitem,
@@ -141,7 +145,8 @@ debug_session_cb(GtkWidget *widget, gboolean data)
   strcpy(strdata, "Encrypt some text!");
   int outlen = 0;
 
-  unsigned char * cipher = encrypt(generate_symmetric_key(), &strdata, &outlen);
+  PK11SymKey *key = generate_symmetric_key();
+  unsigned char * cipher = encrypt(key, &strdata, &outlen);
   
   fprintf(stderr, "Encrypted Data: \n");
   fprintf(stderr, "Data length %i \n",outlen);
@@ -150,7 +155,8 @@ debug_session_cb(GtkWidget *widget, gboolean data)
     fprintf(stderr, "%02x ", cipher[i]);
   fprintf(stderr, "\n");
   
-  purple_debug_info(PLUGIN_ID, "Want to encrypt %s", &strdata);
+  int dec = 0;
+  decrypt(key, cipher, outlen, &dec);
 
 }
 

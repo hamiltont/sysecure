@@ -120,7 +120,9 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
   //     filling the last block
   out_buf_size = out_buf_size + PK11_GetBlockSize(PK11_GetMechanism(key),param);           
   
+  // Alloc and clear our output buffer
   unsigned char *outbuf = malloc(out_buf_size);
+  memset(outbuf, 0, out_buf_size);
   
   if (outbuf == NULL)
   {
@@ -214,9 +216,28 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
   return outbuf;
 }
 
-
-char *
-decrypt(PK11SymKey *key, unsigned char * cipher, unsigned int length)
+/**
+ * This method decrypts some arbitrary data, using the method specified in the 
+ * PK11SymKey. 
+ *
+ * @param key Symmetric key. Method of encryption should _always_ have a suffix
+ *            of _PAD, which indicates that NSS handles any padding necessary
+ *            when performing block cipher operations. This method does not 
+ *            handle padding at all, it assumes NSS is on top of it. 
+ * @param cipher The initial cipher data.
+ * @param cipher_length The length of the input cipher buffer 
+ * @param result_length An output variable. Pass in any random integer, and upon
+ *                      return it will be set to the length of the plain text
+ *                      output. You could _likely_ call strlen() on the returned
+ *                      char *, but this is more convenient, and safer (in case
+ *                      the plain text is not a valid string) 
+ * 
+ * @return A newly allocated array, which contains the plaintext data. Length
+ *         of encrypted data is stored to result_length                      
+ */
+unsigned char *
+decrypt(PK11SymKey *key, unsigned char * cipher, unsigned int cipher_length, 
+        unsigned int * result_length)
 {
 
   unsigned char dec_buf[1024];
@@ -241,12 +262,12 @@ decrypt(PK11SymKey *key, unsigned char * cipher, unsigned int length)
                 &outlen, 
                 sizeof(dec_buf), 
                 cipher,
-                length);
+                cipher_length);
   
   PK11_DigestFinal(EncContext,
                    dec_buf+outlen, 
                    &outlen2, 
-                   length - outlen);
+                   cipher_length - outlen);
   
   
   PK11_DestroyContext(EncContext, PR_TRUE);
