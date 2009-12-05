@@ -345,6 +345,8 @@ decrypt(PK11SymKey *key, unsigned char * cipher, unsigned int cipher_length,
   int result_len = outlen + outlen2;
   
   fprintf(stderr, "Decrypted Data: %s\n", dec_buf);
+  purple_debug_info(PURPLE_ID,
+                    "Decrypted data: %s",dec_buf);
   
   return NULL;
   
