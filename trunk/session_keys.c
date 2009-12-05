@@ -123,6 +123,10 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
   // Alloc and clear our output buffer
   unsigned char *outbuf = malloc(out_buf_size);
   memset(outbuf, 0, out_buf_size);
+  purple_debug_misc(PLUGIN_ID, 
+                    "%d bytes allocated at %p for encryption",
+                    out_buf_size,
+                    outbuf);
   
   if (outbuf == NULL)
   {
@@ -180,8 +184,8 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
                      outbuf+outlen, // Digest should go immediately after 
                                     // encrypted data 
                      &outlen2,      // The length of the digest generated
-                     sizeof(outbuf) - outlen); // Max room available is the 
-                                               // amount originaly there minus
+                     out_buf_size - outlen);   // Max room available is the 
+                                               // amount originally there minus
                                                // what was used
   
   // Check that the digest succeed  
@@ -240,30 +244,96 @@ decrypt(PK11SymKey *key, unsigned char * cipher, unsigned int cipher_length,
         unsigned int * result_length)
 {
 
-  unsigned char dec_buf[1024];
-  int outlen = 0;
-  int outlen2 = 0;
-  
   // Turn our static IV into a SECItem
   SECItem ivItem;
   ivItem.type = siBuffer;
   ivItem.data = gIV;
   ivItem.len = sizeof(gIV);
+
+  unsigned char dec_buf[1024];
+  memset(dec_buf,0,1024);
   
+  if (FALSE) //(dec_buf == NULL)
+  {
+    purple_debug_error(PLUGIN_ID,
+                       "Unable to allocate memory to store the decrypted message!");
+    return NULL;
+  }
+  
+  int outlen = 0;
+  int outlen2 = 0;
+  
+  
+  // Get the parameters needed to start performing the specificed type of 
+  // decryption, using our IV as the seed if a seed is needed for this decrypt
+  // type. 
+  // For us, this is AES_CBC mode. Because CBC mode of decryption needs a
+  // seed IV, this param will be populated with the IV data needed to start 
+  // CBC decryption
   SECItem *param = PK11_ParamFromIV(PK11_GetMechanism(key), &ivItem);
   
+  
+  if (param == NULL)
+  {
+    purple_debug_error(PLUGIN_ID,
+                       "Error when attempting to decrypt message\n");
+                     
+    purple_debug_error(PLUGIN_ID,
+                       "Failure to set up PKCS11 param (err %d)\n",
+                       PR_GetError());
+    
+    purple_debug_error(PLUGIN_ID,
+                       "For SySecure, this likely indicates that no IV was provided\n");
+                       
+    return NULL;
+  }
+  
+  // The context simply wraps our operation into a data structure. This is 
+  // useful if you need to perform multiple operations consecutively on the
+  // same data (like decrypt, then hash to check the integrity)
   PK11Context* EncContext = PK11_CreateContextBySymKey(PK11_GetMechanism(key), 
                                                        CKA_DECRYPT, 
                                                        key, 
                                                        param);
   
-  PK11_CipherOp(EncContext,
-                dec_buf, 
-                &outlen, 
-                sizeof(dec_buf), 
-                cipher,
-                cipher_length);
+  // Perform the decryption
+  SECStatus cipher_status = 
+    PK11_CipherOp(EncContext,
+                  dec_buf,          // buffer to store the decrypted text
+                  &outlen,          // output var that tells us the decrypted
+                                    //   text's length
+                  sizeof(dec_buf),  // The size of the buffer
+                  cipher,           // Input cipher text
+                  cipher_length);   // Amount of cipher text to process
+                
+  // check that the decryption succeeded
+  if (cipher_status != SECSuccess)
+  {
+    purple_debug_error(PLUGIN_ID,
+                       "Error when attempting to decrypt message\n");
+    
+    PRErrorCode code = PR_GetError();
+    purple_debug_error(PLUGIN_ID,
+                       "Failure to perform cipher operation (err %d)\n",
+                       code);
+    
+    purple_debug_error(PLUGIN_ID,
+                       "Error Name - (%s)\n",
+                       PR_ErrorToName(code));
+    
+    purple_debug_error(PLUGIN_ID,
+                       "Error Message - (%s)\n",
+                       PR_ErrorToString(code, PR_LANGUAGE_EN));
+        
+    return NULL;
+  }
   
+  // Digest is another term for hash. This method performs any final operations
+  // on the data, as specified by the EncContext. While it could add a MAC, a 
+  // hash, or a digital signature, in our case (AES CBC) it likely performs no
+  // function. However, we leave this call in, in case one of the future
+  // encryption methods needs this call!
+  SECStatus digest_status = 
   PK11_DigestFinal(EncContext,
                    dec_buf+outlen, 
                    &outlen2, 
