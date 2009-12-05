@@ -27,9 +27,10 @@ typedef struct {
   char* id_name;
   SECKEYPrivateKey* priv;
   SECKEYPublicKey* pub;
+  gboolean trusted;
 } RSA_Key_Pair;
 
-void find_key_pair (char * key_val, GList** temp_ptr);
+gboolean find_key_pair (char * key_val, RSA_Key_Pair** key_pair_ptr);
 
 void generate_RSA_Key_Pair (RSA_Key_Pair** temp_key);
 
