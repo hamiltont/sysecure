@@ -15,39 +15,41 @@
 //INCLUDING the user's.
 GList* SYS_key_ring = NULL;
 
+
 //Given a name and a reference to a GList pointer,
 //sets the pointer to the node with the key-pair
-//identified by key_val.
-void find_key_pair (char * key_val, GList** temp_ptr)
+//identified by key_val in the SYS_key_ring.
+gboolean find_key_pair (char * key_val, RSA_Key_Pair** key_pair_ptr)
 {
-  *temp_ptr = SYS_key_ring;
-  RSA_Key_Pair* temp_key;
+  GList *temp_ptr = SYS_key_ring;
   gboolean found = FALSE;
   if (!SYS_key_ring)
   {
-    *temp_ptr = NULL;
-    return;
+    key_pair_ptr = NULL;
+    return FALSE;
   }
-  while (*temp_ptr != NULL)
+  while (temp_ptr != NULL)
   {
-    temp_key = (RSA_Key_Pair*)((*temp_ptr)->data);
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "looking at key with id: %s.\n", temp_key->id_name);
-    if (!(strcmp(temp_key->id_name, key_val)))
+    *key_pair_ptr = (RSA_Key_Pair*)(temp_ptr->data);
+    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "looking at key with id: %s.\n", (*key_pair_ptr)->id_name);
+    if (!(strcmp((*key_pair_ptr)->id_name, key_val)))
     {
-      purple_debug(PURPLE_DEBUG_INFO, "SySecure", "temp_key->id: %s equals name: %s.\n", temp_key->id_name, key_val);
+      purple_debug(PURPLE_DEBUG_INFO, "SySecure", "temp_key->id: %s equals name: %s.\n", (*key_pair_ptr)->id_name, key_val);
       found = TRUE;
       return;
-      //return (RSA_Key_Pair*)(temp_ptr->data);
     }
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "temp_key->id: %s does not equal name: %s.\n", temp_key->id_name, key_val);
+    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "temp_key->id: %s does not equal name: %s.\n", (*key_pair_ptr)->id_name, key_val);
     
-    *temp_ptr = g_list_next(*temp_ptr);
+    temp_ptr = g_list_next(temp_ptr);
   }
   //If not found, need to clear the pointer.
   if (!found)
   {
-    *temp_ptr = NULL;
+    *key_pair_ptr = NULL;
+    return FALSE;
   }
+  else
+    return TRUE;
 }
 
 void generate_RSA_Key_Pair (RSA_Key_Pair** temp_key)
@@ -73,20 +75,21 @@ void init_pub_key (char* key_val)
 {
   char *key_string;
   RSA_Key_Pair *temp_key;
-  GList* temp_ptr;
+  //GList* temp_ptr;
 
   //set temp_ptr to the head of the key ring
-  temp_ptr = SYS_key_ring;
+  //temp_ptr = SYS_key_ring;
   
   //if key exists, temp_ptr will point to it
   //otherwise it will be NULL and the key will
   //have to be created.
-  find_key_pair(key_val, &temp_ptr);
-  if (temp_ptr == NULL)
+  //find_key_pair(key_val, &temp_key);
+  if (!find_key_pair(key_val, &temp_key))
   {
     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "No key exists for %s...generating new one...\n", key_val);
     generate_RSA_Key_Pair(&temp_key);
     temp_key->id_name = malloc(strlen(key_val)*sizeof(char));
+    temp_key->trusted = TRUE;
     memset(temp_key->id_name, 0, strlen(key_val));
     memcpy(temp_key->id_name, key_val, strlen(key_val) + 1);
     SYS_key_ring = g_list_append(SYS_key_ring, temp_key);
@@ -96,7 +99,6 @@ void init_pub_key (char* key_val)
   else
   {
     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Key exists for %s.\n", key_val);
-    temp_key = (RSA_Key_Pair*)(temp_ptr->data);
     generate_pubkeystring(temp_key->pub, &key_string);
     if (key_string != NULL)
     {
@@ -175,7 +177,7 @@ gboolean pub_key_encrypt (char **enc_msg, char **orig_msg, char *key_val)
   int outlen;
   char* decrypted;
   char* padded_block;
-  GList* temp_ptr;
+  //GList* temp_ptr;
   RSA_Key_Pair *key_struct;
   SECKEYPublicKey *key;
   SECKEYPrivateKey *priv_key;
@@ -184,15 +186,14 @@ gboolean pub_key_encrypt (char **enc_msg, char **orig_msg, char *key_val)
   //get the desired public key if this comes back as a NULL
   //then no key exists in the key ring for that key_val.
   //(Case must be handled)
-  find_key_pair(key_val, &temp_ptr);
-  if (!temp_ptr)
+  //find_key_pair(key_val, &key_struct);
+  if (!find_key_pair(key_val, &key_struct))
   {
     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "pub_key_encrypt: Key for %s not found\n", key_val);
     return FALSE;
   }
 
   //Get the key from the GList node
-  key_struct = (RSA_Key_Pair*) temp_ptr->data;
   key = key_struct->pub;
   priv_key = key_struct->priv;
 
@@ -224,15 +225,13 @@ gboolean wrap_symkey (PK11SymKey *key, SECItem **key_data, char* name)
   int rv = 0;
   SECItem *data;
   SECStatus s;
-  GList *temp_ptr;
   RSA_Key_Pair *key_pair;
-  find_key_pair(name, &temp_ptr);
-  if (temp_ptr == NULL)
+  //find_key_pair(name, &key_pair);
+  if (!find_key_pair(name, &key_pair))
   {
     purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "wrap_symkey: Key for %s not found.", name);
     return FALSE;
   }
-  key_pair = (RSA_Key_Pair*)temp_ptr->data;
   data = (SECItem *) malloc(sizeof(SECItem));
   data->len = SECKEY_PublicKeyStrength(key_pair->pub);
   data->data = malloc(data->len * sizeof(char));
@@ -243,15 +242,14 @@ gboolean wrap_symkey (PK11SymKey *key, SECItem **key_data, char* name)
 
 gboolean unwrap_symkey (SECItem *wrappedKey, char* name, PK11SymKey **unwrapped_key)
 {
-  GList *temp_ptr;
+  //GList *temp_ptr;
   RSA_Key_Pair *key_pair;
-  find_key_pair(name, &temp_ptr);
-  if (temp_ptr == NULL)
+  //find_key_pair(name, &key_pair);
+  if (!find_key_pair(name, &key_pair))
   {
     purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "unwrap_symkey: Key pair for %s not found.", name);
     return FALSE;
   }
-  key_pair = (RSA_Key_Pair*) temp_ptr->data;
   if (key_pair->priv == NULL)
   {
     purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "unwrap_symkey: Privat Key for %s not found.", name);

@@ -142,9 +142,9 @@ gboolean SYS_outgoing_cb (PurpleAccount *account, const char *receiver, char **m
 
   key = generate_symmetric_key();
   key_length = PK11_GetKeyLength(key);
-
   wrap_symkey(key, &key_data, account->username);
   unwrap_symkey(key_data, account->username, &test_key);
+  
   compare_check = compare_symkeys (key, test_key);
   if (compare_check)
     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Key generated and wrapped and unwrapped successfully.\n");
@@ -155,7 +155,7 @@ gboolean SYS_outgoing_cb (PurpleAccount *account, const char *receiver, char **m
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Key generated and wrapped.  Length: %d Key_buff: %s\n", key_length, key_buff);
 
   //pub_key_encrypt(&enc_msg, &(*message), account->username);
-
+  
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "TEMP_Message Sent: %s.\n",
                temp_string);
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Message Sent: %s.\n",
