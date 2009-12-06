@@ -69,6 +69,8 @@
 #include "pub_key.h"
 #include "session_keys.h"
 
+gboolean conv_check (char *id, PurpleConversation **conv);
+
 gboolean SYS_enabled_check (char *id);
 
 char* SYS_tag_check (char *message, char *tag);
