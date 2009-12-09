@@ -155,7 +155,6 @@ gboolean process_SYS_message (char* sysecure_content, char** decrypted_message, 
     purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "Process message.  Failed to get enc_message.\n");
        return FALSE;
   }
-  //purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "enc_sess_key: %s enc_message: %s.\n", enc_sess_key, enc_message);
   //2) Decrypt the session key
   //sess_key_item = NSSBase64_DecodeBuffer(NULL, NULL, enc_sess_key, strlen(enc_sess_key));
   //unwrap_symkey(sess_key, sender, &sess_key);
@@ -163,15 +162,17 @@ gboolean process_SYS_message (char* sysecure_content, char** decrypted_message, 
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Received encrypted session key <START>%s<END>\n", enc_sess_key);
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Received encrypted message <START>%s<END>\n", enc_message);
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "strlen(enc_sess_key): %d strlen(enc_message): %d\n", strlen(enc_sess_key), strlen(enc_message));
-  //char debug_char = malloc(strlen(enc_sess_key)*sizeof(char));
-  //return FALSE;
   *decrypted_message = malloc(strlen(enc_sess_key)*sizeof(char));
-  //return FALSE;
   memset(*decrypted_message, 0, strlen(enc_sess_key));
   strcat(*decrypted_message, enc_sess_key);
   return TRUE;
 }
 
+gboolean add_public_key (char *pub_key_content, RSA_Key_Pair **key_pair, char* id)
+{
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Inside add_public_key(%s, key_ref, %s).", pub_key_content, id);
+  return FALSE;
+}
 
 //SYS_incoming_cb: 
 //1) Check to see if conversation exists (if not create it!)
@@ -192,7 +193,7 @@ gboolean SYS_incoming_cb (PurpleAccount *acct, char **who, char **message,
   if (!conv_check(*who, &conv))
   {
     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "SYS_incoming_cb: No conversation for %s.  Creating one.\n", *who);
-    return TRUE;
+      conv = purple_conversation_new(PURPLE_CONV_TYPE_IM, acct, *who);
   }
 
   //2) Check for ;;SYSECURE;; and ;;/SYSECURE;; tags
@@ -203,7 +204,13 @@ gboolean SYS_incoming_cb (PurpleAccount *acct, char **who, char **message,
    //a) Check for public key message
     if (get_msg_component(sysecure_content, pub_tag, pub_close_tag, &pub_key_content))
     {
-     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Public Key received: <START>%s<END>\n", pub_key_content);
+      purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Public Key received: <START>%s<END>\n", pub_key_content);
+      RSA_Key_Pair* key_pair;
+      if (!add_public_key(pub_key_content, &key_pair, *who))
+      {
+        purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "Failed to store new key for %s.\n", *who);
+        return TRUE;
+      }
     }
     else 
     //b) Process SYSECURE message
@@ -350,6 +357,9 @@ gboolean SYS_outgoing_cb (PurpleAccount *account, const char *receiver, char **m
 
   //Initialize pub_key
   init_pub_key(account->username);
+//argument description (PurpleConnection, dest_display_name, msg, flag)
+//serv_send_im(my_list->data, purple_connection_get_display_name(my_list->data), char_two, PURPLE_MESSAGE_SEND);
+  //send_pub_key(account, 
 
   //1) SySecure enabled or message NULL?
   if (!SYS_enabled_check(receiver) || !(*message))
