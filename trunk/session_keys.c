@@ -347,8 +347,8 @@ decrypt(PK11SymKey *key, unsigned char * cipher, unsigned int cipher_length,
   fprintf(stderr, "Decrypted Data: %s\n", dec_buf);
   purple_debug_info(PLUGIN_ID,
                     "Decrypted data: %s",dec_buf);
-  
   return NULL;
+  //return dec_buf;
   
 }
 #endif
