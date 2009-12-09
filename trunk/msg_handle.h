@@ -80,5 +80,7 @@ gboolean SYS_incoming_cb (PurpleAccount *acct, char **who, char **message,
 
 gboolean SYS_outgoing_cb (PurpleAccount *account, const char *receiver, char **message);
 
+void SYS_create_conversation_cb (PurpleConversation *conv);
+
 
 #endif //MSG_HANDLE_H
