@@ -58,6 +58,22 @@ gboolean add_public_key (char *pub_key_content, char* id)
   CERTSubjectPublicKeyInfo *key_info = 0;
   SECKEYPublicKey *public_key;
   RSA_Key_Pair *key_pair = malloc(sizeof(RSA_Key_Pair));
+  RSA_Key_Pair *key_check;
+
+  if (find_key_pair(id, &key_check))
+  {
+    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Key exists for %s. Disregarding received public key.\n", id);
+/*
+    RSA_Key_Pair *debug_key;
+    char name[] = "nataliarevenan";
+    find_key_pair(name, &debug_key);
+    if (SECITEM_ItemsAreEqual(SECKEY_EncodeDERSubjectPublicKeyInfo(key_check->pub), SECKEY_EncodeDERSubjectPublicKeyInfo(debug_key->pub)))
+      purple_debug(PURPLE_DEBUG_INFO, "SySecure", "And it was decoded properly %s's key matches %s's key!\n", key_check->id_name, debug_key->id_name);
+    else
+      purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "It was decoded improperly!.\n");
+*/
+    return TRUE;
+  }
   
   //purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Inside add_public_key(%s, %s).", pub_key_content, id);
    //Get the public key from the data stream

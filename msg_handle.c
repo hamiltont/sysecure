@@ -130,7 +130,7 @@ gboolean get_msg_component (char *message, char *open_tag, char *close_tag, char
 //7) If the hashes equal, then decrypted_message will point to the 
 //   plaintext message and TRUE is returned.
 //   Else FALSE is returned.
-gboolean process_SYS_message (char* sysecure_content, char** decrypted_message, char* sender)
+gboolean process_SYS_message (char* sysecure_content, char** decrypted_message, char* sender, char* receiver)
 {
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "DEBUG. sysecure_content: <S>%s<E> sender: %s.\n", sysecure_content, sender);
   char* enc_sess_key;
@@ -148,6 +148,7 @@ gboolean process_SYS_message (char* sysecure_content, char** decrypted_message, 
      purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "Process message.  Failed to get enc_sess_key.\n");
        return FALSE;
   }
+  
   //1) b) Get the encrypted message
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Trying to get %s component from %s\n", emsg_tag, sysecure_content);
   if (!(get_msg_component(sysecure_content, emsg_tag, emsg_close_tag, &enc_message)))
@@ -156,9 +157,15 @@ gboolean process_SYS_message (char* sysecure_content, char** decrypted_message, 
        return FALSE;
   }
   //2) Decrypt the session key
-  //sess_key_item = NSSBase64_DecodeBuffer(NULL, NULL, enc_sess_key, strlen(enc_sess_key));
-  //unwrap_symkey(sess_key, sender, &sess_key);
+  sess_key_item = NSSBase64_DecodeBuffer(NULL, NULL, enc_sess_key, strlen(enc_sess_key));
+  if (sess_key_item)
+    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Session key item decoded!");
 
+  if (unwrap_symkey(sess_key, receiver, &sess_key))
+    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Session key recovered!");
+  else
+    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Session key recovery FAILED!");
+  
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Received encrypted session key <START>%s<END>\n", enc_sess_key);
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Received encrypted message <START>%s<END>\n", enc_message);
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "strlen(enc_sess_key): %d strlen(enc_message): %d\n", strlen(enc_sess_key), strlen(enc_message));
@@ -210,8 +217,7 @@ gboolean SYS_incoming_cb (PurpleAccount *acct, char **who, char **message,
     else 
     //b) Process SYSECURE message
     {
-     //NOTE:  USING USERNAME FOR DEBUGGING ONLY!!!
-     if (!process_SYS_message(sysecure_content, &decrypted_message, acct->username))
+     if (!process_SYS_message(sysecure_content, &decrypted_message, *who, acct->username))
      {
        purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "Protocol error.  Could not parse message <START>%s<END>\n",sysecure_content);
        return TRUE;
@@ -273,8 +279,7 @@ void create_outgoing_msg (RSA_Key_Pair *key_pair, char **message, char *sender, 
 
   //1) Add the Session Key, encrypted
   session_key = generate_symmetric_key();
-  //NOTE:  I am wrapping this in the sender's public key for debugging purposes ONLY.
-  wrap_symkey(session_key, &wrapped_key, sender);
+  wrap_symkey(session_key, &wrapped_key, receiver);
   wrapped_keybuff = NSSBase64_EncodeItem(0, 0, 0, wrapped_key);
   //add ;;S_KEY;; tag to the beginning and end of the encrypted KS
   add_tags_to_message(key_tag, key_close_tag, wrapped_keybuff, &temp_message);
