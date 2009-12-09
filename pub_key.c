@@ -17,8 +17,8 @@ GList* SYS_key_ring = NULL;
 
 
 //Given a name and a reference to a GList pointer,
-//sets the pointer to the node with the key-pair
-//identified by key_val in the SYS_key_ring.
+//sets the pointer to the key-pair identified by 
+//key_val in the SYS_key_ring.
 gboolean find_key_pair (char * key_val, RSA_Key_Pair** key_pair_ptr)
 {
   GList *temp_ptr = SYS_key_ring;

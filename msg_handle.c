@@ -8,6 +8,8 @@
   char crypt_close_tag[] = ";;/SYSECURE;;";
   char id_tag[] = ";;ID;;";
   char id_close_tag[] = ";;/ID;;";
+  char pub_tag[] = ";;PUB_KEY;;";
+  char pub_close_tag[] = ";;/PUB_KEY;;";
   char key_tag[] = ";;S_KEY;;";
   char key_close_tag[] = ";;/S_KEY;;";
   char emsg_tag[] = ";;E_MSG;;";
@@ -17,6 +19,10 @@
   char hash_tag[] = ";;HASH;;";
   char hash_close_tag[] = ";;/HASH;;";
 
+//Given a name and a reference (null) to a PurpleConversation
+//reference, returns TRUE if a conversation matching *id is
+//found and FALSE if it is not.  If true *conv will be the 
+//desired conversation.  If false *conv will be null.
 gboolean conv_check (char *id, PurpleConversation **conv)
 {
   GList *conv_list = NULL;
@@ -48,46 +54,32 @@ gboolean conv_check (char *id, PurpleConversation **conv)
     return FALSE;
 }
 
+//Given an id, this function finds the conversation
+//designated by that name and returns true if 
+//SYSECURE is enabled for that conversation and FALSE
+//if it is not.
 gboolean SYS_enabled_check (char *id)
 {
-  GList *conv_list = NULL;
-  GList *temp_ptr = NULL;
+  PurpleConversation *conv;
   EncryptionInfo *e_info;
-  gboolean found = FALSE;
-  conv_list = purple_get_conversations();
-  temp_ptr = conv_list;
-  if (conv_list == NULL)
+  if (!conv_check(id, &conv))
   {
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "NO CONVERSATIONS from purple_get_conversations()!\n");
+    purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "CONV with %s not found!", id);
     return FALSE;
   }
-  while(temp_ptr && found == FALSE)
-  {
-    if ((purple_conversation_get_name((PurpleConversation*)(temp_ptr->data))) == id)
-    {
-      found = TRUE;
-    }
-    if (!found)
-      temp_ptr = temp_ptr->next;
-  }
-  if (!temp_ptr)
-    return FALSE;
-  else
-  {
-    e_info = get_encryption_info((PurpleConversation*)(temp_ptr->data));
-    if (!(e_info))
+  e_info = get_encryption_info(conv);
+  if (!(e_info))
       purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "SYS_enabled_check: e_info is NULL!");
-    else 
-    {
-      if (e_info->is_encrypted)
-        purple_debug(PURPLE_DEBUG_INFO, "SySecure", "SYS_enabled_check: e_info->is_encrypted is TRUE!");
-      else
-        purple_debug(PURPLE_DEBUG_INFO, "SySecure", "SYS_enabled_check: e_info->is_encrypted is FALSE!");
-    }
-    return e_info->is_encrypted;
-  }
+  if (!(e_info->is_encrypted))
+      purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "SYS_enabled_check: is_encrypted is NULL for conversation with %s!", id);
+  return e_info->is_encrypted;
 }
 
+
+//Given a messags and a tag, this returns true if
+//the tag is in the message and false if it is not.
+//(this is basically a good quick check as to 
+//whether or not a message is of a certain type).
 char* SYS_tag_check (char *message, char *tag)
 {
   char* tag_ptr;
@@ -100,32 +92,102 @@ char* SYS_tag_check (char *message, char *tag)
 //string equal to the information between the tags.
 gboolean get_msg_component (char *message, char *open_tag, char *close_tag, char **result)
 {
-  char *open_ptr;
-  char *close_ptr;
-  char *temp_ptr;
+  char *open_ptr = NULL;
+  char *close_ptr = NULL;
+  char *temp_ptr = NULL;
   open_ptr = strstr(message, open_tag);
   close_ptr = strstr(message, close_tag);
 
   if (!open_ptr || !close_ptr)
+  {
+    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Requested section not found: %s [] %s\n", open_tag, close_tag);
     return FALSE;
+  }
 
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "DEBUG: open_ptr %c close_ptr %c.\n", *open_ptr, *close_ptr);
   open_ptr = open_ptr + strlen(open_tag);
   *result = malloc((close_ptr - open_ptr)*sizeof(char));
-  strncpy(*result, open_ptr, close_ptr - open_ptr);
-  *result[close_ptr - open_ptr] = '\0';
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "DEBUG: open_ptr %c close_ptr %c.\n", *open_ptr, *close_ptr);
+  memcpy(*result, open_ptr, close_ptr - open_ptr);
+  memset(*result + (close_ptr - open_ptr), '\0', 1);
   return TRUE;
 }
 
+//Given a sysecure message with the ;;SYSECURE;; open and close tags
+//stripped, this function processes the message in the following steps:
+//1) Parses the message into its parts:
+//   a) ;;S_KEY;; Encrypted(Sender_Public_Key, Session_Key)
+//   b) ;;E_MSG;; Encrypted(Session_Key, MSG||Encrypted(Sender_Private_Key, Hash(MSG))
+//      (1) MSG
+//      (2) Encrypted Hash
+//2) Decrypts the session key
+//   a) Need to convert from ASCII to binary then
+//   b) Unwrap it
+//3) Decrypts E_MSG
+//4) Parses the MSG and the Encrypted Hash
+//5) Decrypts the Encrypted Hash using the sender's public key
+//6) Takes a hash of the MSG
+//7) If the hashes equal, then decrypted_message will point to the 
+//   plaintext message and TRUE is returned.
+//   Else FALSE is returned.
+gboolean process_SYS_message (char* sysecure_content, char** decrypted_message, char* sender)
+{
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "DEBUG. sysecure_content: <S>%s<E> sender: %s.\n", sysecure_content, sender);
+  char* enc_sess_key;
+  SECItem* sess_key_item;
+  PK11SymKey* sess_key;
+  char* enc_message;
+  char* message;
+  char* enc_hash;
+  char* decrypted_hash;
+  char* message_hash;
+  //1) a) Get the encrypted session key and encrypted message from sysecure_content
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Trying to get %s component from %s\n", key_tag, sysecure_content);
+  if (!(get_msg_component(sysecure_content, key_tag, key_close_tag, &enc_sess_key)))
+  {
+     purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "Process message.  Failed to get enc_sess_key.\n");
+       return FALSE;
+  }
+  //1) b) Get the encrypted message
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Trying to get %s component from %s\n", emsg_tag, sysecure_content);
+  if (!(get_msg_component(sysecure_content, emsg_tag, emsg_close_tag, &enc_message)))
+  {
+    purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "Process message.  Failed to get enc_message.\n");
+       return FALSE;
+  }
+  //purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "enc_sess_key: %s enc_message: %s.\n", enc_sess_key, enc_message);
+  //2) Decrypt the session key
+  //sess_key_item = NSSBase64_DecodeBuffer(NULL, NULL, enc_sess_key, strlen(enc_sess_key));
+  //unwrap_symkey(sess_key, sender, &sess_key);
+
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Received encrypted session key <START>%s<END>\n", enc_sess_key);
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Received encrypted message <START>%s<END>\n", enc_message);
+  char debug_char = malloc(strlen(enc_sess_key)*sizeof(char));
+  return FALSE;
+  *decrypted_message = malloc(strlen(enc_sess_key)*sizeof(char));
+  return FALSE;
+  memset(*decrypted_message, 0, strlen(enc_sess_key));
+  strcat(*decrypted_message, enc_sess_key);
+  return TRUE;
+}
+
+
 //SYS_incoming_cb: 
 //1) Check to see if conversation exists (if not create it!)
-//2) Check for SySecure tag
-//   a) If ;;SYS_PUBLIC_KEY;; then record public key
-//   b) If ;;SYSECURE;; then process the message
+//2) Check for SySecure tag.  If ;;SYSECURE;; tag present then
+//   a) If ;;PUBLIC_KEY;; then record public key
+//   b) Else then process the message and write it to the 
+//      screen (or else an error message if it fails).
 gboolean SYS_incoming_cb (PurpleAccount *acct, char **who, char **message,
                                     PurpleConversation *conv, int *flags)
 {
-  char *msg_component;
+  char *sysecure_content;
+  char *pub_key_content;
+  char *message_content;
+  char *decrypted_message;
   //1) Check to see if conversation exists
+  //   NOTE:  Need to add the CREATION of the 
+  //   conversation if one doesn't exist
   if (!conv_check(*who, &conv))
   {
     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "SYS_incoming_cb: No conversation for %s.  Creating one.\n", *who);
@@ -133,16 +195,36 @@ gboolean SYS_incoming_cb (PurpleAccount *acct, char **who, char **message,
   }
 
   //2) Check for ;;SYSECURE;; and ;;/SYSECURE;; tags
-  if (get_msg_component(*message, crypt_tag, crypt_close_tag, &msg_component))
+  if (get_msg_component(*message, crypt_tag, crypt_close_tag, &sysecure_content))
   {
     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "SySecure message identified.\n"); 
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "MSG Component: %s\n", msg_component);
+    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "SYSECURE tag includes: <START>%s<END>\n", sysecure_content);
+   //a) Check for public key message
+    if (get_msg_component(sysecure_content, pub_tag, pub_close_tag, &pub_key_content))
+    {
+     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Public Key received: <START>%s<END>\n", pub_key_content);
+    }
+    else 
+    //b) Process SYSECURE message
+    {
+     //NOTE:  USING USERNAME FOR DEBUGGING ONLY!!!
+     if (!process_SYS_message(sysecure_content, &decrypted_message, acct->username))
+     {
+       purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "Protocol error.  Could not parse message <START>%s<END>\n",sysecure_content);
+       return TRUE;
+     }
+      purple_conversation_write(conv, NULL, 
+	  					decrypted_message, PURPLE_MESSAGE_RECV, time(NULL));
+      return TRUE;
+    }
   }
   else
+  {
     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Non-encrypted message received.\n"); 
 
-  purple_conversation_write(conv, NULL, 
+    purple_conversation_write(conv, NULL, 
 	  					*message, PURPLE_MESSAGE_RECV, time(NULL));
+  }
   return TRUE;
   
 }
@@ -178,6 +260,7 @@ void create_outgoing_msg (RSA_Key_Pair *key_pair, char **message, char *sender, 
   char* temp_message;
   char* temp_message2;
   char* temp_message3;
+  char* temp_message4;
   unsigned char* temp_encrypted_message;
   char *encrypted_message;
   unsigned int encrypted_msg_length;
@@ -211,21 +294,29 @@ void create_outgoing_msg (RSA_Key_Pair *key_pair, char **message, char *sender, 
   memset(temp_message3, 0, strlen(temp_message) + strlen(temp_message2));
   strcat(temp_message3, temp_message);
   strcat(temp_message3, temp_message2);
+  add_tags_to_message(crypt_tag, crypt_close_tag, temp_message3, &temp_message4);
 
   //Set temp_message to a concatenation of temp_message and temp_message2
   free(temp_message);
-  temp_message = malloc (strlen(temp_message3)*sizeof(char));
-  memset(temp_message, 0, strlen(temp_message3));
-  memcpy(temp_message, temp_message3, strlen(temp_message3) + 1);
+  temp_message = malloc (strlen(temp_message4)*sizeof(char));
+  memset(temp_message, 0, strlen(temp_message4));
+  memcpy(temp_message, temp_message4, strlen(temp_message4) + 1);
   //Now overwrite message so that it reflects all the updates from above.
   free(*message);
   *message = malloc(strlen(temp_message)*sizeof(char));
   memset(*message, 0, strlen(temp_message));
   memcpy(*message, temp_message, strlen(temp_message) + 1);
 
+/*  //DEBUGGING ONLY
+  char* debug;
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "DEBUGGING: temp_message3 <START>%s<END> sender %s\n", temp_message3, sender);
+  process_SYS_message (temp_message3, &debug, sender);
+  //END DEBUGGING*/
+
   free(temp_message);
   free(temp_message2);
   free(temp_message3);
+  free(temp_message4);
   free(encrypted_message);
   free(wrapped_keybuff);
 }
