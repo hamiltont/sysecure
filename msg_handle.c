@@ -357,9 +357,6 @@ gboolean SYS_outgoing_cb (PurpleAccount *account, const char *receiver, char **m
 
   //Initialize pub_key
   init_pub_key(account->username);
-//argument description (PurpleConnection, dest_display_name, msg, flag)
-//serv_send_im(my_list->data, purple_connection_get_display_name(my_list->data), char_two, PURPLE_MESSAGE_SEND);
-  //send_pub_key(account, 
 
   //1) SySecure enabled or message NULL?
   if (!SYS_enabled_check(receiver) || !(*message))
@@ -397,6 +394,54 @@ gboolean SYS_outgoing_cb (PurpleAccount *account, const char *receiver, char **m
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "TEMP_MSG: %s MESSAGE: %s\n", temp_message, *message);
   
   return TRUE;
+}
+
+gboolean send_pub_key (PurpleConversation *conv)
+{
+  RSA_Key_Pair *key_pair;
+  SECItem *key_data;
+  //SECItem *key_check;
+  char* key_buffer;
+  char* pub_key_wrap;
+  char* pub_key_message;
+  PurpleConnection *connect;
+  GList *connect_list;
+
+  if (!find_key_pair(conv->account->username, &key_pair))
+  {
+    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "No key exists for user %s.\n", conv->account->username);
+    return TRUE;
+  }
+   key_data = SECKEY_EncodeDERSubjectPublicKeyInfo(key_pair->pub);
+   key_buffer = NSSBase64_EncodeItem(0, 0, 0, key_data);
+   add_tags_to_message(pub_tag, pub_close_tag, key_buffer, &pub_key_wrap);
+   add_tags_to_message(crypt_tag, crypt_close_tag, pub_key_wrap, &pub_key_message);
+   //purple_debug(PURPLE_DEBUG_INFO, "SySecure", "User %s's key ready to send: %s\n", conv->account->username, key_buffer);
+
+   connect_list = purple_connections_get_all();
+   connect = (PurpleConnection*) connect_list->data;
+   serv_send_im(connect, conv->name, pub_key_message, PURPLE_MESSAGE_SEND);
+   
+
+   //DEBUG ONLY
+   /*key_check = NSSBase64_DecodeBuffer(0, 0, key_buffer, strlen(key_buffer));
+   if(SECITEM_ItemsAreEqual(key_data, key_check))
+     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Pub Key encoded and decoded successfully\n");
+   else
+     purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "Pub Key encoded and decoded UNSUCCESSFULLY\n");
+   */
+   return TRUE;
+}
+
+//Upon creation of a new conversation, attempt to immediately
+//send your public key.
+void SYS_create_conversation_cb (PurpleConversation *conv)
+{
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", 
+               "New conversation created between user %s and buddy %s.\n", 
+                                         conv->account->username, conv->name);
+  init_pub_key(conv->account->username);
+  send_pub_key(conv);
 }
 
 #endif //MSG_HANDLE_C

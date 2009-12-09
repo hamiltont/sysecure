@@ -59,6 +59,8 @@ static gboolean plugin_load(PurplePlugin *plugin)
                         PURPLE_CALLBACK(SYS_incoming_cb), NULL);
   purple_signal_connect(conv_handle, "sending-im-msg", plugin,
                         PURPLE_CALLBACK(SYS_outgoing_cb), NULL);
+  purple_signal_connect(conv_handle, "conversation-created", plugin,
+                        PURPLE_CALLBACK(SYS_create_conversation_cb), NULL);
   
   /* Now just return TRUE to tell libpurple to finish loading. */
   return TRUE;
