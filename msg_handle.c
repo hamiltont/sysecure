@@ -137,7 +137,8 @@ gboolean process_SYS_message (char* sysecure_content, char** decrypted_message, 
   SECItem* sess_key_item;
   PK11SymKey* sess_key;
   char* enc_message;
-  char* message;
+  unsigned char* binary_enc_message;
+  unsigned char* message;
   char* enc_hash;
   char* decrypted_hash;
   char* message_hash;
@@ -161,11 +162,41 @@ gboolean process_SYS_message (char* sysecure_content, char** decrypted_message, 
   if (sess_key_item)
     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Session key item decoded!");
 
-  if (unwrap_symkey(sess_key, receiver, &sess_key))
+  if (unwrap_symkey(sess_key_item, receiver, &sess_key))
     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Session key recovered!");
   else
     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Session key recovery FAILED!");
-  
+
+  //3) Decrypt E_MSG
+
+  int binary_length;
+  binary_enc_message = ATOB_AsciiToData(enc_message, &binary_length);
+  if (!binary_enc_message)
+  {
+    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Failed to convert binary to ASCII.\n");
+    return FALSE;
+  }
+  int message_length;
+  message = decrypt(sess_key, binary_enc_message, binary_length, &message_length);
+  if (!message)
+  {
+    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Failed to decrypt message.\n");
+    return FALSE;
+  }
+  char *temp_message = malloc ((message_length + 1)*sizeof(char));
+  memset(temp_message, 0, message_length + 1);
+  strncat(temp_message, message, message_length);
+  temp_message[message_length + 1] = '\0';
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "DECRYPTED MESSAGE: %s", message);
+//decrypt(PK11SymKey *key, unsigned char * cipher, unsigned int cipher_length, 
+        //unsigned int * result_length)
+  //encrypted_message = BTOA_DataToAscii(temp_encrypted_message, encrypted_msg_length);
+  //temp_encrypted_message = encrypt(session_key, *message, &encrypted_msg_length);
+
+  //temp_encrypted_message is binary...the function below will convert it to sendable
+  //ASCII code.
+  //encrypted_message = BTOA_DataToAscii(temp_encrypted_message, encrypted_msg_length);
+
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Received encrypted session key <START>%s<END>\n", enc_sess_key);
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Received encrypted message <START>%s<END>\n", enc_message);
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "strlen(enc_sess_key): %d strlen(enc_message): %d\n", strlen(enc_sess_key), strlen(enc_message));
