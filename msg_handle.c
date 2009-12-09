@@ -168,12 +168,6 @@ gboolean process_SYS_message (char* sysecure_content, char** decrypted_message, 
   return TRUE;
 }
 
-gboolean add_public_key (char *pub_key_content, RSA_Key_Pair **key_pair, char* id)
-{
-  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Inside add_public_key(%s, key_ref, %s).", pub_key_content, id);
-  return FALSE;
-}
-
 //SYS_incoming_cb: 
 //1) Check to see if conversation exists (if not create it!)
 //2) Check for SySecure tag.  If ;;SYSECURE;; tag present then
@@ -205,12 +199,13 @@ gboolean SYS_incoming_cb (PurpleAccount *acct, char **who, char **message,
     if (get_msg_component(sysecure_content, pub_tag, pub_close_tag, &pub_key_content))
     {
       purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Public Key received: <START>%s<END>\n", pub_key_content);
-      RSA_Key_Pair* key_pair;
-      if (!add_public_key(pub_key_content, &key_pair, *who))
+      if (!add_public_key(pub_key_content, *who))
       {
         purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "Failed to store new key for %s.\n", *who);
         return TRUE;
       }
+      else 
+       return TRUE;
     }
     else 
     //b) Process SYSECURE message

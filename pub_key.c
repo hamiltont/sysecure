@@ -52,6 +52,33 @@ gboolean find_key_pair (char * key_val, RSA_Key_Pair** key_pair_ptr)
     return TRUE;
 }
 
+gboolean add_public_key (char *pub_key_content, char* id)
+{
+  SECItem *key_data;
+  CERTSubjectPublicKeyInfo *key_info = 0;
+  SECKEYPublicKey *public_key;
+  RSA_Key_Pair *key_pair = malloc(sizeof(RSA_Key_Pair));
+  
+  //purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Inside add_public_key(%s, %s).", pub_key_content, id);
+   //Get the public key from the data stream
+   key_data = NSSBase64_DecodeBuffer(0, 0, pub_key_content, strlen(pub_key_content));
+   key_info = SECKEY_DecodeDERSubjectPublicKeyInfo(key_data);
+   public_key = SECKEY_ExtractPublicKey(key_info);
+
+  //Copy the key and append it to the SYS_key_ring
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Importing key for %s\n", id);
+  key_pair->id_name = malloc(strlen(id)*sizeof(char));
+  key_pair->trusted = TRUE;
+  memset(key_pair->id_name, 0, strlen(id));
+  memcpy(key_pair->id_name, id, strlen(id) + 1);
+  key_pair->pub = public_key;
+  SYS_key_ring = g_list_append(SYS_key_ring, key_pair);
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "New key created for: %s.\n",
+            key_pair->id_name);
+  
+  return TRUE;
+}
+
 void generate_RSA_Key_Pair (RSA_Key_Pair** temp_key)
 {
   PK11SlotInfo *slot = 0;
