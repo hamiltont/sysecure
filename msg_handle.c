@@ -106,7 +106,7 @@ gboolean get_msg_component (char *message, char *open_tag, char *close_tag, char
 
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "DEBUG: open_ptr %c close_ptr %c.\n", *open_ptr, *close_ptr);
   open_ptr = open_ptr + strlen(open_tag);
-  *result = malloc((close_ptr - open_ptr)*sizeof(char));
+  *result = malloc((close_ptr - open_ptr + 1) *sizeof(char));
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "DEBUG: open_ptr %c close_ptr %c.\n", *open_ptr, *close_ptr);
   memcpy(*result, open_ptr, close_ptr - open_ptr);
   memset(*result + (close_ptr - open_ptr), '\0', 1);
@@ -162,10 +162,11 @@ gboolean process_SYS_message (char* sysecure_content, char** decrypted_message, 
 
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Received encrypted session key <START>%s<END>\n", enc_sess_key);
   purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Received encrypted message <START>%s<END>\n", enc_message);
-  char debug_char = malloc(strlen(enc_sess_key)*sizeof(char));
-  return FALSE;
+  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "strlen(enc_sess_key): %d strlen(enc_message): %d\n", strlen(enc_sess_key), strlen(enc_message));
+  //char debug_char = malloc(strlen(enc_sess_key)*sizeof(char));
+  //return FALSE;
   *decrypted_message = malloc(strlen(enc_sess_key)*sizeof(char));
-  return FALSE;
+  //return FALSE;
   memset(*decrypted_message, 0, strlen(enc_sess_key));
   strcat(*decrypted_message, enc_sess_key);
   return TRUE;
