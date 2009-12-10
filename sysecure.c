@@ -23,28 +23,40 @@
 #include <version.h>
 #include <debug.h>
 
-#include "sysecure.h"
-
 #include "conv_encrypt_map.h"
 #include "gtk_ui.h"
 #include "msg_handle.h"
 #include "pub_key.h"
 
+#include "sysecure.h"
+
 /**
  * Called when SySecure is first loaded. Registers signal callbacks, 
  * and adds SySecure menu to open conversations
+ *
+ * @return TRUE if plugin should continue loading, FALSE otherwise
  */
 static gboolean plugin_load(PurplePlugin *plugin)
 {
-  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Compiled with Purple '%d.%d.%d'.\n",
-             PURPLE_MAJOR_VERSION, PURPLE_MINOR_VERSION, PURPLE_MICRO_VERSION);
+  purple_debug_info(PLUGIN_ID,
+                    "Compiled with Purple '%d.%d.%d'.\n",
+                    PURPLE_MAJOR_VERSION, 
+                    PURPLE_MINOR_VERSION, 
+                    PURPLE_MICRO_VERSION);
 
   if (!nss_init())
-    purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "NSS is not enabled.  SySecure unavailable.\n");
-
+  {
+    purple_debug_error(PLUGIN_ID,
+                       "NSS is not enabled. SySecure unable to operate.\n");
+    
+    // TODO - pop up a notify box for the user
+    
+    return FALSE;
+  }
+  
   // TODO: If we plan to use a UI other than GTK+, we should register for the
   //       signals for that UI here. 
-
+  
   void * conv_handle;
   //Get Conversation Handle and initialize our plugin handle
   conv_handle = purple_conversations_get_handle();
