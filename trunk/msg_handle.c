@@ -3,55 +3,81 @@
 
 #include "msg_handle.h"
 
-  //Declare message tags
-  char crypt_tag[] = ";;SYSECURE;;";
-  char crypt_close_tag[] = ";;/SYSECURE;;";
-  char id_tag[] = ";;ID;;";
-  char id_close_tag[] = ";;/ID;;";
-  char pub_tag[] = ";;PUB_KEY;;";
-  char pub_close_tag[] = ";;/PUB_KEY;;";
-  char key_tag[] = ";;S_KEY;;";
-  char key_close_tag[] = ";;/S_KEY;;";
-  char emsg_tag[] = ";;E_MSG;;";
-  char emsg_close_tag[] = ";;/E_MSG;;";
-  char msg_tag[] = ";;MSG;;";
-  char msg_close_tag[] = ";;/MSG;;";
-  char hash_tag[] = ";;HASH;;";
-  char hash_close_tag[] = ";;/HASH;;";
+// Declare message tags
+// These are used to wrapper encrypted messages and other sysecure-specific
+// information that is being send over the IM channel. 
+// TODO - comment these individually. Many of them are not used right now...
+static char crypt_tag[] = ";;SYSECURE;;";
+static char crypt_close_tag[] = ";;/SYSECURE;;";
 
-//Given a name and a reference (null) to a PurpleConversation
-//reference, returns TRUE if a conversation matching *id is
-//found and FALSE if it is not.  If true *conv will be the 
-//desired conversation.  If false *conv will be null.
-gboolean conv_check (char *id, PurpleConversation **conv)
+static char id_tag[] = ";;ID;;";
+static char id_close_tag[] = ";;/ID;;";
+
+static char pub_tag[] = ";;PUB_KEY;;";
+static char pub_close_tag[] = ";;/PUB_KEY;;";
+
+static char key_tag[] = ";;S_KEY;;";
+static char key_close_tag[] = ";;/S_KEY;;";
+
+static char emsg_tag[] = ";;E_MSG;;";
+static char emsg_close_tag[] = ";;/E_MSG;;";
+
+static char msg_tag[] = ";;MSG;;";
+static char msg_close_tag[] = ";;/MSG;;";
+
+static char hash_tag[] = ";;HASH;;";
+static char hash_close_tag[] = ";;/HASH;;";
+
+/**
+ * Convenience method which locates and stores the PurpleConversation with 
+ * the given name into the conv parameter. 
+ *
+ * @param name A null-terminated string representing the conversation name, as
+ *             would be returned by purple_conversation_get_name()
+ * @param conv An out parameter. If a conversation is found that has the passed
+ *             name, then it be stored at *conv. Otherwise, *conv will be NULL
+ *
+ * @return TRUE if a conversation was found and stored into conv with the 
+ *         passed name, FALSE otherwise
+ */
+static gboolean 
+find_conversation_from_name (char *name, PurpleConversation **conv)
 {
+  // Declare all vars up front
   GList *conv_list = NULL;
-  GList *temp_ptr = NULL;
-  EncryptionInfo *e_info;
   gboolean found = FALSE;
+  
+  // Init all vars
   conv_list = purple_get_conversations();
-  temp_ptr = conv_list;
+  
+  // Print out a nice error message if there are no conversations
+  // Receiving this message would likely indicate that this method should not 
+  // have been called
   if (conv_list == NULL)
   {
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "NO CONVERSATIONS from purple_get_conversations()!\n");
+    purple_debug_info(PLUGIN_ID,
+                      "No conversations from purple_get_conversations(). Unable to find conversation with name '%s'\n",
+                      name);
     return FALSE;
   }
-  while(temp_ptr && !found)
+  
+  // Try to find the conversation
+  while(conv_list && !found)
   {
-    if (strcmp(purple_conversation_get_name((PurpleConversation*)(temp_ptr->data)), id) == 0)
-    {
+    if (strcmp(purple_conversation_get_name((PurpleConversation*)(conv_list->data)), name) == 0)
       found = TRUE;
-    }
-    if (!found)
-      temp_ptr = temp_ptr->next;
+    else 
+      conv_list = conv_list->next;
   }
+  
+  // Store the found convo
   if (found)
   {
-    *conv = ((PurpleConversation*)(temp_ptr->data));
+    *conv = ((PurpleConversation*)(conv_list->data));
     return TRUE;
   }
-  else
-    return FALSE;
+  
+  return FALSE;
 }
 
 //Given an id, this function finds the conversation
@@ -62,7 +88,7 @@ gboolean SYS_enabled_check (char *id)
 {
   PurpleConversation *conv;
   EncryptionInfo *e_info;
-  if (!conv_check(id, &conv))
+  if (!find_conversation_from_name(id, &conv))
   {
     purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "CONV with %s not found!", id);
     return FALSE;
@@ -222,7 +248,7 @@ gboolean SYS_incoming_cb (PurpleAccount *acct, char **who, char **message,
   //1) Check to see if conversation exists
   //   NOTE:  Need to add the CREATION of the 
   //   conversation if one doesn't exist
-  if (!conv_check(*who, &conv))
+  if (!find_conversation_from_name(*who, &conv))
   {
     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "SYS_incoming_cb: No conversation for %s.  Creating one.\n", *who);
       conv = purple_conversation_new(PURPLE_CONV_TYPE_IM, acct, *who);

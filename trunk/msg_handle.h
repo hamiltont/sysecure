@@ -41,7 +41,7 @@
 // Needed for a lot
 #include <glib.h>
 
-//Pidgin-LibPurple includes:
+// Pidgin-LibPurple includes:
 #include "server.h"
 #include "request.h"
 #include "cmds.h"
@@ -51,7 +51,7 @@
 #include "debug.h"
 #include "conversation.h"
 
-//Standard C includes:
+// Standard C includes:
 #include "stdio.h"
 #include "time.h"
 #include "stdlib.h"
@@ -64,12 +64,10 @@
 #include "nssb64.h"
 #include "base64.h"
 
-//SYSECURE includes:
+// SYSECURE includes:
 #include "conv_encrypt_map.h"
 #include "pub_key.h"
 #include "session_keys.h"
-
-gboolean conv_check (char *id, PurpleConversation **conv);
 
 gboolean SYS_enabled_check (char *id);
 
