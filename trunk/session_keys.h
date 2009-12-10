@@ -28,6 +28,8 @@
 
 PK11SymKey * generate_symmetric_key();
 
+PK11SymKey * get_static_key();
+
 void debug_symmetric_key(PK11SymKey * key);
 
 unsigned char * 

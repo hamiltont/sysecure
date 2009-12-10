@@ -38,7 +38,11 @@
 
 // Needed as long as this file references PK11SymKey. This should only be 
 // here while sysecure has debug options on the menu
+#include "nss.h"
 #include "pk11pub.h"
+#include "pkcs11.h"
+#include "seccomon.h"
+#include "secmodt.h"
 
 #include "gtk_ui.h"
 
@@ -142,20 +146,35 @@ debug_session_cb(GtkWidget *widget, gboolean data)
   //debug_symmetric_key(generate_symmetric_key());
   
   unsigned char strdata[1024];
-  strcpy(strdata, "Encrypt some text!");
-  int outlen = 0;
+  strcpy((char *)strdata, "poopy");
+  unsigned int outlen = 0;
+
+ fprintf(stderr, "\nPlain Data: \n");
+  fprintf(stderr, "Data length %i \n",strlen((char*)strdata) + 1);
+  int i;
+  for (i=0; i<strlen((char*)strdata); i++)
+    fprintf(stderr, "%02x ", strdata[i]);
+  fprintf(stderr, "\n");
+
 
   PK11SymKey *key = generate_symmetric_key();
-  unsigned char * cipher = encrypt(key, &strdata, &outlen);
+  //PK11SymKey *key = get_static_key();
+    
+  if (key == NULL)
+    return;
+        
+  unsigned char * cipher = encrypt(key, (unsigned char *)&strdata, &outlen);
   
+  if (cipher == NULL)
+    return;
+    
   fprintf(stderr, "Encrypted Data: \n");
   fprintf(stderr, "Data length %i \n",outlen);
-  int i;
   for (i=0; i<outlen; i++)
     fprintf(stderr, "%02x ", cipher[i]);
   fprintf(stderr, "\n");
   
-  int dec = 0;
+  unsigned int dec = 0;
   decrypt(key, cipher, outlen, &dec);
 
 }

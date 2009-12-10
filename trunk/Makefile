@@ -20,7 +20,7 @@
 PACKAGE=sysecure
 VERSION=0.1
 
-SOURCES = sysecure.o globals.o conv_encrypt_map.o gtk_ui.o msg_handle.o pub_key.o session_keys.o
+SOURCES = sysecure.o globals.o conv_encrypt_map.o gtk_ui.o msg_handle.o pub_key.o nss_mgf1.o nss_oaep.o session_keys.o 
           
 PACKDIR=/tmp/pidgin-$(PACKAGE)-$(VERSION)
 

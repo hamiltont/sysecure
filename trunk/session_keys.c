@@ -20,7 +20,14 @@
 #include "session_keys.h"
 
 // Random IV for now. IV matters because we are using CBC mode of encryption
-static unsigned char gIV[] = {0xe4, 0xbb, 0x3b, 0xd3, 0xc3, 0x71, 0x2e, 0x58};
+static unsigned char gIV[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+// Unchanging SymKey. Useful for debugging changes to the file
+// Note that this key is 16 bytes AKA 128 bits 
+// Should be used for 128 bit AES
+static unsigned char gKey[] = {0xe8, 0xa7, 0x7c, 0xe2, 0x05, 0x63, 0x6a, 0x31,
+                               0xe8, 0xa7, 0x7c, 0xe2, 0x05, 0x63, 0x6a, 0x31};
 
 PK11SymKey *
 generate_symmetric_key()
@@ -30,15 +37,75 @@ generate_symmetric_key()
   // then someone has to pad the input with some extra data. We add _PAD to 
   // inform NSS that it should handle this padding for us, we don't want to 
   // manage it ourself
-  CK_MECHANISM_TYPE keygenMech = CKM_AES_CBC_PAD;
+  CK_MECHANISM_TYPE keygenMech = CKM_DES_CBC_PAD;
   
-  PK11SymKey* sym_key = PK11_KeyGen(PK11_GetInternalKeySlot(),
+  PK11SymKey* sym_key = PK11_KeyGen(PK11_GetBestSlot(keygenMech, NULL),
                                     keygenMech, 
                                     NULL, 
                                     128/8, 
                                     NULL);
 
   return sym_key;
+}
+
+/**
+ * Used to generate a static key. Will always return the exact same key, should
+ * only be used for debugging purposes
+ */
+PK11SymKey*  
+get_static_key()
+{
+  SECItem keyItem;
+  PK11SlotInfo* slot = NULL;
+  CK_MECHANISM_TYPE  cipherMech;
+  PK11SymKey* SymKey;
+  
+  // NSS passes blobs around as SECItems. These contain a pointer to 
+  // data and a length. Turn the raw key into a SECItem. 
+  keyItem.type = siBuffer;
+  keyItem.data = gKey;
+  keyItem.len = sizeof(gKey);
+  
+  cipherMech = CKM_AES_CBC_PAD;
+  slot = PK11_GetBestSlot(cipherMech, NULL);
+
+  if (slot == NULL)
+  {
+    fprintf(stderr, "Unable to find security device (err %d)\n",
+            PR_GetError());
+    return NULL;
+  }
+  
+  // Turn the raw key into a key object. We use PK11_OriginUnwrap 
+  // to indicate the key was unwrapped - which is what should be done 
+  // normally anyway - using raw keys isn't a good idea 
+  SymKey = PK11_ImportSymKey(slot,
+                             cipherMech,
+                             PK11_OriginUnwrap,
+                             CKA_ENCRYPT,
+                             &keyItem,
+                             NULL);
+  if (SymKey == NULL)
+  {
+    PRErrorCode code = PR_GetError();
+    purple_debug_error(PLUGIN_ID,
+                       "Failure to generate static symmetric key (err %d)\n",
+                       code);
+    
+    purple_debug_error(PLUGIN_ID,
+                       "Is the key the correct size? Check the key size needed for your encryption method\n");
+    
+    purple_debug_error(PLUGIN_ID,
+                       "Error Name - (%s)\n",
+                       PR_ErrorToName(code));
+    
+    purple_debug_error(PLUGIN_ID,
+                       "Error Message - (%s)\n",
+                       PR_ErrorToString(code, PR_LANGUAGE_EN));
+    return NULL;
+  }
+  
+  return SymKey;
 }
 
 void
@@ -49,7 +116,8 @@ debug_symmetric_key(PK11SymKey * key)
   
   purple_debug_info(PLUGIN_ID,
                     "Mecahanism: 0x%x\n",
-                    PK11_GetMechanism(key));
+                    (unsigned int) PK11_GetMechanism(key)); // cast to remove
+                                                            // compiler warning
                     
   purple_debug_info(PLUGIN_ID,
                     "Key-Length: %i\n",
@@ -81,6 +149,11 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
   ivItem.type = siBuffer;
   ivItem.data = gIV;
   ivItem.len = sizeof(gIV);
+  
+  purple_debug_info(PLUGIN_ID,
+                    "Encrypting '%s' with length %i\n",
+                    plain,
+                    strlen((char*)plain)+1);
   
   // Get the parameters needed to start performing the specificed type of 
   // encryption, using our IV as the seed if a seed is needed for this enc.
@@ -115,23 +188,24 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
   
   // We are using a block cipher, so our output buffer needs to be
   // (1) at least as big as the input text
-  int out_buf_size = strlen(plain) * sizeof(char);
+  int out_buf_size = strlen((char *)plain) * sizeof(char); // cast to remove 
+                                                           // compiler warning 
   // (2) plus one extra block, in case the input had to be padded to complete
   //     filling the last block
-  out_buf_size = out_buf_size + PK11_GetBlockSize(PK11_GetMechanism(key),param);           
+  out_buf_size = out_buf_size + PK11_GetBlockSize(PK11_GetMechanism(key),param);
   
   // Alloc and clear our output buffer
-  unsigned char *outbuf = malloc(out_buf_size);
+  unsigned char *outbuf = g_malloc(out_buf_size);
   memset(outbuf, 0, out_buf_size);
   purple_debug_misc(PLUGIN_ID, 
-                    "%d bytes allocated at %p for encryption",
+                    "%d bytes allocated at %p for encryption\n",
                     out_buf_size,
                     outbuf);
   
   if (outbuf == NULL)
   {
     purple_debug_error(PLUGIN_ID,
-                       "Unable to allocate memory to store the encrypted message!");
+                       "Unable to allocate memory to store the encrypted message!\n");
     return NULL;
   }
                                          
@@ -139,6 +213,8 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
   // was allocated, it may not all be used. This param tells you exactly how
   // much was used
   int outlen = 0;
+  
+  fprintf(stderr, "Input data length: %i\n", strlen((char*)plain) + 1);
     
   // Perform the encryption 
   SECStatus cipher_status = PK11_CipherOp(EncContext,         // Context, useful for chaining operations
@@ -146,7 +222,7 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
                               &outlen,            // Out param - turns into the length of the result
                               out_buf_size,       // The max size the output 
                               plain,              // Input data
-                              strlen(plain) + 1); // Input data length (amount to encrypt)
+                              strlen((char *)plain) + 1); // Input data length (amount to encrypt)
   
   
   // check that the cipher succeeded
@@ -168,10 +244,22 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
                        "Error Message - (%s)\n",
                        PR_ErrorToString(code, PR_LANGUAGE_EN));
         
+    purple_debug_info(PLUGIN_ID,
+                      "Freeing pointer at %p",
+                      outbuf);
+    g_free(outbuf);
+    
     return NULL;
   }
   
-  int outlen2 = 0;
+  fprintf(stderr, "Encrypted Data: \n");
+  fprintf(stderr, "Data length %i \n",outlen);
+  int i;
+  for (i=0; i < out_buf_size; i++)
+    fprintf(stderr, "%02x ", outbuf[i]);
+  fprintf(stderr, "\n");
+  
+  unsigned int outlen2 = 0;
   
   // Digest is another term for hash. This method performs any final operations
   // on the data, as specified by the EncContext. While it could add a MAC, a 
@@ -182,8 +270,8 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
     PK11_DigestFinal(EncContext,    // Context, lets this method know if it
                                     // needs to do anything
                      outbuf+outlen, // Digest should go immediately after 
-                                    // encrypted data 
-                     &outlen2,      // The length of the digest generated
+                                      // encrypted data 
+                     &outlen2,        // The length of the digest generated
                      out_buf_size - outlen);   // Max room available is the 
                                                // amount originally there minus
                                                // what was used
@@ -193,13 +281,35 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
   {
     purple_debug_error(PLUGIN_ID,
                        "Error when attempting to encrypt message\n");
-                     
+                  
+    PRErrorCode code = PR_GetError();   
     purple_debug_error(PLUGIN_ID,
                        "Failure to perform digest(hash) operation (err %d)\n",
-                       PR_GetError());
+                       code);
+    
+    purple_debug_error(PLUGIN_ID,
+                       "Error Name - (%s)\n",
+                       PR_ErrorToName(code));
+    
+    purple_debug_error(PLUGIN_ID,
+                       "Error Message - (%s)\n",
+                       PR_ErrorToString(code, PR_LANGUAGE_EN));
+    
+    fprintf(stderr, "Error when adding message digest\n");
+    
+    purple_debug_misc(PLUGIN_ID,
+                      "Freeing pointer at %p\n",
+                      outbuf);
+    g_free(outbuf);
     
     return NULL;
   }  
+  
+  fprintf(stderr, "Encrypted plus digest : \n");
+  fprintf(stderr, "Digest length %i \n",outlen2);
+  for (i=0; i<out_buf_size; i++)
+    fprintf(stderr, "%02x ", outbuf[i]);
+  fprintf(stderr, "\n");
   
   // Release the memory for the context
   PK11_DestroyContext(EncContext, PR_TRUE);
@@ -261,7 +371,7 @@ decrypt(PK11SymKey *key, unsigned char * cipher, unsigned int cipher_length,
   }
   
   int outlen = 0;
-  int outlen2 = 0;
+  unsigned int outlen2 = 0;
   
   
   // Get the parameters needed to start performing the specificed type of 
@@ -334,10 +444,27 @@ decrypt(PK11SymKey *key, unsigned char * cipher, unsigned int cipher_length,
   // function. However, we leave this call in, in case one of the future
   // encryption methods needs this call!
   SECStatus digest_status = 
-  PK11_DigestFinal(EncContext,
-                   dec_buf+outlen, 
-                   &outlen2, 
-                   cipher_length - outlen);
+    PK11_DigestFinal(EncContext,
+                     dec_buf+outlen, 
+                     &outlen2, 
+                     cipher_length - outlen);
+  
+  
+  // Check that the digest succeed  
+  if (digest_status != SECSuccess)
+  {
+    fprintf(stderr, "Decrypted Data: %s\n", dec_buf);
+  purple_debug_info(PLUGIN_ID,
+                    "Decrypted data: %s\n",dec_buf);
+    purple_debug_error(PLUGIN_ID,
+                       "Error when attempting to decrypt message\n");
+                     
+    purple_debug_error(PLUGIN_ID,
+                       "Failure to perform digest(hash) operation (err %d)\n",
+                       PR_GetError());
+    
+    return NULL;
+  }
   
   
   PK11_DestroyContext(EncContext, PR_TRUE);
@@ -346,7 +473,7 @@ decrypt(PK11SymKey *key, unsigned char * cipher, unsigned int cipher_length,
   
   fprintf(stderr, "Decrypted Data: %s\n", dec_buf);
   purple_debug_info(PLUGIN_ID,
-                    "Decrypted data: %s",dec_buf);
+                    "Decrypted data: %s\n",dec_buf);
   return NULL;
   //return dec_buf;
   
