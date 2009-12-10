@@ -1,3 +1,12 @@
+/**
+ * @file
+ * @brief Holds all of the globals needed by many core files in SySecure 
+ * 
+ * Currently holds the EncryptionInfo structure, and some #defines for PLUGIN
+ * information
+ */
+ 
+ 
 #ifndef GLOBALS_C
 #define GLOBALS_C
 
@@ -8,13 +17,7 @@
 #  define G_GNUC_NULL_TERMINATED
 # endif
 #endif
-/**
- * @file
- * @brief Holds all of the globals needed by many core files in SySecure 
- * 
- * Currently holds the EncryptionInfo structure, and some #defines for PLUGIN
- * information
- */
+
 
 #include "globals.h"
 
