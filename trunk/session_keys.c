@@ -1,3 +1,15 @@
+/**
+ * @file
+ * @brief Allows symmetric encryption, decryption, and key generation 
+ * 
+ * Currently has methods to perform encryption, decryption, symmetric key 
+ * generation. Also has some helper methods to use static data, which can
+ * be useful for debugging. 
+ *
+ * @TODO - This file does not encrypt/decrypt properly with some input. Debug..
+ * TODO 
+ */
+ 
 #ifndef SESSION_KEYS_C
 #define SESSION_KEYS_C
 

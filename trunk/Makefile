@@ -34,7 +34,6 @@ DEFINES=-DPACKAGE=\"$(PACKAGE)\" -DVERSION=\"$(VERSION)\"
 CFLAGS ?= -g3 -O2 -Wall
 override CFLAGS += $(DEFINES)
 
-
   # *nix Compiler Stuff
   PIDGIN_CFLAGS=$(shell pkg-config --cflags pidgin) $(shell pkg-config --cflags gtk+-2.0) $(shell pkg-config --cflags nss) -DDATADIR=\"$(shell pkg-config --variable=datadir pidgin)\"
   PIDGIN_LDFLAGS=$(shell pkg-config --libs pidgin) $(shell pkg-config --libs gtk+-2.0) $(shell pkg-config --libs nss)

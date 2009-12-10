@@ -38,16 +38,18 @@
  */
 static gboolean plugin_load(PurplePlugin *plugin)
 {
-  purple_debug_info(PLUGIN_ID,
-                    "Compiled with Purple '%d.%d.%d'.\n",
-                    PURPLE_MAJOR_VERSION, 
-                    PURPLE_MINOR_VERSION, 
-                    PURPLE_MICRO_VERSION);
+  purple_debug(PURPLE_DEBUG_INFO,
+               PLUGIN_ID,
+               "Compiled with Purple '%d.%d.%d'.\n",
+               PURPLE_MAJOR_VERSION, 
+               PURPLE_MINOR_VERSION, 
+               PURPLE_MICRO_VERSION);
 
   if (!nss_init())
   {
-    purple_debug_error(PLUGIN_ID,
-                       "NSS is not enabled. SySecure unable to operate.\n");
+    purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID,
+                 "NSS is not enabled. SySecure unable to operate.\n");
     
     // TODO - pop up a notify box for the user
     
@@ -85,7 +87,7 @@ static gboolean plugin_load(PurplePlugin *plugin)
 static gboolean
 plugin_unload(PurplePlugin *plugin)
 {
-  //disconnect signals on unload
+  // disconnect signals on unload
   purple_signals_disconnect_by_handle(plugin);
 
   // unload the GTK+ UI
@@ -94,10 +96,13 @@ plugin_unload(PurplePlugin *plugin)
   // unload the encryption mapping
   uninit_conv_encryption_map();
   
-  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Unloaded Successfully.\n");
-  //Return TRUE to allow the plugin to continue unloading
-  //NOTE: If "FALSE" is returned, the plugin will not be unloaded, Pidgin will
-  //display an error.  The plugin WILL be unloaded anyway when Pidgin is closed.
+  purple_debug(PURPLE_DEBUG_INFO,
+               PLUGIN_ID,
+               "Unloaded Successfully.\n");
+  
+  // Return TRUE to allow the plugin to continue unloading
+  // NOTE: If "FALSE" is returned, the plugin will not be unloaded, Pidgin will
+  // display an error.  The plugin WILL be unloaded anyway when Pidgin is closed.
   return TRUE;
 }
 
