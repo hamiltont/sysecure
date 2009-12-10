@@ -372,15 +372,16 @@ decrypt(PK11SymKey *key, unsigned char * cipher, unsigned int cipher_length,
   ivItem.data = gIV;
   ivItem.len = sizeof(gIV);
 
-  unsigned char dec_buf[1024];
-  memset(dec_buf,0,1024);
+  unsigned char *dec_buf = g_malloc(1024);
   
-  if (FALSE) //(dec_buf == NULL)
+  if (dec_buf == NULL)
   {
     purple_debug_error(PLUGIN_ID,
                        "Unable to allocate memory to store the decrypted message!");
     return NULL;
   }
+  
+  memset(dec_buf,0,1024);
   
   int outlen = 0;
   unsigned int outlen2 = 0;
@@ -424,7 +425,7 @@ decrypt(PK11SymKey *key, unsigned char * cipher, unsigned int cipher_length,
                   dec_buf,          // buffer to store the decrypted text
                   &outlen,          // output var that tells us the decrypted
                                     //   text's length
-                  sizeof(dec_buf),  // The size of the buffer
+                  1024,  // The size of the buffer
                   cipher,           // Input cipher text
                   cipher_length);   // Amount of cipher text to process
                 
@@ -486,8 +487,6 @@ decrypt(PK11SymKey *key, unsigned char * cipher, unsigned int cipher_length,
   fprintf(stderr, "Decrypted Data: %s\n", dec_buf);
   purple_debug_info(PLUGIN_ID,
                     "Decrypted data: %s\n",dec_buf);
-  return NULL;
-  //return dec_buf;
-  
+  return dec_buf;
 }
 #endif
