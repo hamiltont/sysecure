@@ -69,14 +69,13 @@
 #include "pub_key.h"
 #include "session_keys.h"
 
-gboolean SYS_incoming_cb (PurpleAccount *acct, char **who, char **message,
-                                    PurpleConversation *conv, int *flags);
+gboolean receiving_im_cb (PurpleAccount *acct, char **who, char **message,
+                                    PurpleConversation *conv, PurpleMessageFlags *flags);
 
-gboolean SYS_outgoing_cb (PurpleAccount *account, const char *receiver, char **message);
+void sending_im_cb (PurpleAccount *account, const char *receiver, char **message);
 
 void SYS_create_conversation_cb (PurpleConversation *conv);
 
 char* get_tag_location (char *message, char *tag);
-
 
 #endif //MSG_HANDLE_H

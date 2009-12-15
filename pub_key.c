@@ -114,6 +114,12 @@ void generate_RSA_Key_Pair (RSA_Key_Pair** temp_key)
   return;
 }
 
+/**
+ *
+ * @todo make this take the PurpleAccount (rather than some random ass char*).
+ *       That way we can easily change the mapping later to _anything_ in the 
+ *       account, without having to fix all the external dependencies
+ */
 void init_pub_key (char* key_val)
 {
   char *key_string;
@@ -263,7 +269,7 @@ gboolean pub_key_encrypt (char **enc_msg, char **orig_msg, char *key_val)
   return TRUE;
 }
 
-gboolean wrap_symkey (PK11SymKey *key, SECItem **key_data, char* name)
+gboolean wrap_symkey (PK11SymKey *key, SECItem **key_data, const char* name)
 {
   int rv = 0;
   SECItem *data;

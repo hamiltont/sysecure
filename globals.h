@@ -11,12 +11,15 @@
 #define PLUGIN_VERSION "0.1"
 
 /**
- * Used to hold the encryption info for a single conversation 
+ * Used to hold the encryption info for a single PurpleConversation 
  */
-// TODO - Move all struct stuff into it's own file, and access
-// the struct using getter methods to hide the allocation, etc
 struct _EncryptionInfo {
+  /** Flag for encryption or plain transmission */
   gboolean is_encrypted;
+  
+  // TODO - Move all struct stuff into it's own file, and access
+  // the struct using getter methods to hide the allocation, etc
+
 };
 typedef struct _EncryptionInfo EncryptionInfo;
 

@@ -1,4 +1,15 @@
-#ifndef MSG_HANDLE_C
+/**
+ * @file
+ * @brief Responsible for intercepting messages, and encrypting/decrypting if 
+ *        the active conversation is supposed to be encrypted. 
+ * 
+ * Calls on the session_keys file, and the public_keys file to generate keys, 
+ * and to actually perform the enc / dec. This file is mainly responsible for 
+ * understanding the sysecure message format, and for composing / decomposing 
+ * the various parts into a single unified message
+ *
+ */
+ #ifndef MSG_HANDLE_C
 #define MSG_HANDLE_C
 
 #include "msg_handle.h"
@@ -6,7 +17,7 @@
 // Declare message tags
 // These are used to wrapper encrypted messages and other sysecure-specific
 // information that is being send over the IM channel. 
-// TODO - comment these individually. Many of them are not used right now...
+// @todo - comment these individually. Many of them are not used right now...
 static char crypt_tag[] = ";;SYSECURE;;";
 static char crypt_close_tag[] = ";;/SYSECURE;;";
 
@@ -108,7 +119,7 @@ is_enabled (const char *name)
  *
  * @return A pointer to the location in message that the tag was found, or NULL
  *
- * @TODO Is this method used? Can it be removed? Answer: Yes, it is occasionally
+ * @todo Is this method used? Can it be removed? Answer: Yes, it is occasionally
  *       used for debugging. Can be removed after version 1.0 release and we are
  *       sure this is stable
  */
@@ -146,7 +157,6 @@ get_msg_component (char *message, char *open_tag, char *close_tag, char **result
   // Declare vars
   char *open_ptr = NULL;
   char *close_ptr = NULL;
-  char *temp_ptr = NULL;
   
   // Init vars
   open_ptr = strstr(message, open_tag);
@@ -164,7 +174,7 @@ get_msg_component (char *message, char *open_tag, char *close_tag, char **result
 
   purple_debug(PURPLE_DEBUG_MISC,
                PLUGIN_ID,
-               "Found a component in message. First value in component value is '%c', last is '%s'.\n",
+               "Found a component in message. First value in component value is '%c', last is '%c'.\n",
                *open_ptr,
                *close_ptr);
                
@@ -174,30 +184,13 @@ get_msg_component (char *message, char *open_tag, char *close_tag, char **result
   // Malloc enough to hold the entire component, plus a null-terminating
   *result = g_malloc((close_ptr - open_ptr + 1) * sizeof(char));
   
-  // Copy the component into the result
-  memset(*result, open_ptr, close_ptr - open_ptr);
+  // Copy the component into the result 
+  memset(*result, (int)open_ptr, close_ptr - open_ptr); // cast for compiler warning
   memset(*result + (close_ptr - open_ptr), '\0', 1);
   
   return TRUE;
 }
 
-//Given a sysecure message with the ;;SYSECURE;; open and close tags
-//stripped, this function processes the message in the following steps:
-//1) Parses the message into its parts:
-//   a) ;;S_KEY;; Encrypted(Sender_Public_Key, Session_Key)
-//   b) ;;E_MSG;; Encrypted(Session_Key, MSG||Encrypted(Sender_Private_Key, Hash(MSG))
-//      (1) MSG
-//      (2) Encrypted Hash
-//2) Decrypts the session key
-//   a) Need to convert from ASCII to binary then
-//   b) Unwrap it
-//3) Decrypts E_MSG
-//4) Parses the MSG and the Encrypted Hash
-//5) Decrypts the Encrypted Hash using the sender's public key
-//6) Takes a hash of the MSG
-//7) If the hashes equal, then decrypted_message will point to the 
-//   plaintext message and TRUE is returned.
-//   Else FALSE is returned.
 /**
  * @brief Given a SySecure instant message, this function extracts the components 
  * (the actual message, the wrapped session key, and the hash). The components
@@ -229,7 +222,7 @@ get_msg_component (char *message, char *open_tag, char *close_tag, char **result
  *          is returned.  
  *
  *
- * @param secure_content The sysecure IM content, without the wrapping sysecure
+ * @param sysecure_content The sysecure IM content, without the wrapping sysecure
  *                       open and close tags. 
  * @param decrypted_message An out parameter. If this function returns TRUE, 
  *                          then this variable stores a (newly g_malloced())
@@ -242,11 +235,11 @@ get_msg_component (char *message, char *open_tag, char *close_tag, char **result
  *         the hash of the decrypted message matches the hash originally sent. 
  *         return false otherwise
  *
- * @TODO - This does not actually perform hash checking at this point. This 
- *         should be completed. 
+ * @todo This does not actually perform hash checking at this point. This 
+ *       should be completed. 
  */
 gboolean 
-process_SYS_message (char* sysecure_content, char** decrypted_message, char* sender, char* receiver)
+decompose_and_decrypt_message (char* sysecure_content, unsigned char** decrypted_message, char* sender, char* receiver)
 {
   char* enc_sess_key;   // The encrypted session key
   SECItem* sess_key_item; // The encrypted session key, after it has been converted from ASCII form to binary
@@ -254,12 +247,14 @@ process_SYS_message (char* sysecure_content, char** decrypted_message, char* sen
   char* enc_message;    // The encrypted message, including the (twice encrypted) hash
   unsigned char* binary_enc_message;  // The encrypted message, after it has been converted from ASCII to binary
   unsigned char* message;   // The fully decrypted message
-  char* enc_hash;
-  char* decrypted_hash;
-  char* message_hash;
   gboolean success;   // Used in various locations to ensure the last performed operation was successful
-  int binary_length; // Used to convert the encrypted message from ASCII to binary
-  int message_length; // Used to keep track of the size of the decrypted message
+  unsigned int binary_length; // Used to convert the encrypted message from ASCII to binary
+  unsigned int message_length; // Used to keep track of the size of the decrypted message
+  
+  // None of these are used. Should be used for hash
+  //char* enc_hash;
+  //char* decrypted_hash;
+  //char* message_hash;
   
   purple_debug(PURPLE_DEBUG_INFO,
                PLUGIN_ID,
@@ -332,7 +327,7 @@ process_SYS_message (char* sysecure_content, char** decrypted_message, char* sen
   success = unwrap_symkey(sess_key_item,
                           receiver, 
                           &sess_key);  // TODO - this is likely malloc'ed. We 
-                                       //        may need to clean it up
+                                      //        may need to clean it up
   if (success == FALSE)
   {
     purple_debug(PURPLE_DEBUG_ERROR,
@@ -389,36 +384,12 @@ process_SYS_message (char* sysecure_content, char** decrypted_message, char* sen
   }
   
   // Cleanup what we have allocated
-  *decrypted_message = message;
   g_free(enc_sess_key);   
   g_free(enc_message);
   g_free(binary_enc_message);
   
-  /*
-  // Used to test 
-  
-  char *temp_message = malloc ((message_length + 1)*sizeof(char));
-  memset(temp_message, 0, message_length + 1);
-  strncat(temp_message, message, message_length);
-  temp_message[message_length + 1] = '\0';
-  
-  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "DECRYPTED MESSAGE: %s", message);
-  //decrypt(PK11SymKey *key, unsigned char * cipher, unsigned int cipher_length, 
-        //unsigned int * result_length)
-  //encrypted_message = BTOA_DataToAscii(temp_encrypted_message, encrypted_msg_length);
-  //temp_encrypted_message = encrypt(session_key, *message, &encrypted_msg_length);
-
-  //temp_encrypted_message is binary...the function below will convert it to sendable
-  //ASCII code.
-  //encrypted_message = BTOA_DataToAscii(temp_encrypted_message, encrypted_msg_length);
-  
-  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Received encrypted session key <START>%s<END>\n", enc_sess_key);
-  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Received encrypted message <START>%s<END>\n", enc_message);
-  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "strlen(enc_sess_key): %d strlen(enc_message): %d\n", strlen(enc_sess_key), strlen(enc_message));
-  *decrypted_message = malloc(strlen(enc_sess_key)*sizeof(char));
-  memset(*decrypted_message, 0, strlen(enc_sess_key));
-  strcat(*decrypted_message, enc_sess_key);
-  */
+  // Actually assign to out param
+  *decrypted_message = message;
   
   return TRUE;
 }
@@ -429,159 +400,327 @@ process_SYS_message (char* sysecure_content, char** decrypted_message, char* sen
 //   a) If ;;PUBLIC_KEY;; then record public key
 //   b) Else then process the message and write it to the 
 //      screen (or else an error message if it fails).
-gboolean SYS_incoming_cb (PurpleAccount *acct, char **who, char **message,
-                                    PurpleConversation *conv, int *flags)
+/**
+ * Handles an incoming IM. There are three options:
+ * (1) This is an unencrypted message, just show it
+ * (2) This is a public key announcement, just store the key
+ * (3) This is an encrypted message. Decrypt and show. 
+ * 
+ * @param acct The account the message was received on
+ * @param sender The username of the sender. Can be modified (remember to free
+ *               the original value if you modify!)
+ * @param message The original modified. Can be modified by freeing the passed
+ *                message and putting a new one in place
+ * @param conv The IM conversation. Can be NULL if this is the first incoming
+ *             message (aka, no conv actually exists yet)
+ * @param flags The message flags
+ *
+ * @return TRUE to suppress **message from being shown to then receiver, FALSE
+ *         otherwise
+ */
+gboolean 
+receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
+                 PurpleConversation *conv, PurpleMessageFlags *flags)
 {
+  // Used to hold the contents of certain parts of messages
   char *sysecure_content;
   char *pub_key_content;
-  char *message_content;
   char *decrypted_message;
-  //1) Check to see if conversation exists
-  //   NOTE:  Need to add the CREATION of the 
-  //   conversation if one doesn't exist
-  if (!find_conversation_from_name(*who, &conv))
-  {
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "SYS_incoming_cb: No conversation for %s.  Creating one.\n", *who);
-      conv = purple_conversation_new(PURPLE_CONV_TYPE_IM, acct, *who);
-  }
-
-  //2) Check for ;;SYSECURE;; and ;;/SYSECURE;; tags
-  if (get_msg_component(*message, crypt_tag, crypt_close_tag, &sysecure_content)) // TODO - make sure to free sysecure_content
-  {
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "SySecure message identified.\n"); 
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "SYSECURE tag includes: <START>%s<END>\n", sysecure_content);
-   //a) Check for public key message
-    if (get_msg_component(sysecure_content, pub_tag, pub_close_tag, &pub_key_content)) // TODO - make sure to g_free() pub_key_content
-    {
-      purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Public Key received: <START>%s<END>\n", pub_key_content);
-      if (!add_public_key(pub_key_content, *who))
-      {
-        purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "Failed to store new key for %s.\n", *who);
-        return TRUE;
-      }
-      else 
-       return TRUE;
-    }
-    else 
-    //b) Process SYSECURE message
-    {
-     if (!process_SYS_message(sysecure_content, &decrypted_message, *who, acct->username))
-     {
-       purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "Protocol error.  Could not parse message <START>%s<END>\n",sysecure_content);
-       return TRUE;
-     }
-      purple_conversation_write(conv, NULL, 
-	  					decrypted_message, PURPLE_MESSAGE_RECV, time(NULL));
-      return TRUE;
-    }
-  }
-  else
-  {
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Non-encrypted message received.\n"); 
-
-    purple_conversation_write(conv, NULL, 
-	  					*message, PURPLE_MESSAGE_RECV, time(NULL));
-  }
-  return TRUE;
   
+  // Used in many places to indicate current success or failure
+  gboolean success; 
+  
+  // If this is the first message someone has sent us, a 'conversation' has not
+  // started. If we were to toss out the first message, it would never start. 
+  // For this reason, the conv parameter may actually be null
+  // If it is, then we want to create it
+  if (conv == NULL)
+  {
+    purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID,
+                 "First message received from %s. Creating a conversation\n",
+                 *sender);
+    conv = purple_conversation_new(PURPLE_CONV_TYPE_IM, acct, *sender);
+  }
+  
+  // Check for ;;SYSECURE;; and ;;/SYSECURE;; tags
+  success = get_msg_component(*message,
+                              crypt_tag, 
+                              crypt_close_tag, 
+                              &sysecure_content); // TODO - make sure to free sysecure_content
+  if (success == FALSE) 
+  {
+    purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID,
+                 "Non-encrypted message received.\n"); 
+	
+	  // Just show the message as normal
+	  return FALSE;
+  }
+  
+  
+  purple_debug(PURPLE_DEBUG_INFO,
+               PLUGIN_ID,
+               "SySecure message identified.\n"); 
+  purple_debug(PURPLE_DEBUG_INFO, 
+               PLUGIN_ID,
+               "SySecure tag includes: <START>%s<END>\n",
+               sysecure_content);
+   
+  // ============================================================
+  // 
+  // Behaviour of next section depends on if the message is a public key
+  // announcement, or if the message is a encrypted message
+  //
+  // ============================================================
+  
+   
+  // Check for public key announcement message
+  success = get_msg_component(sysecure_content, 
+                              pub_tag, 
+                              pub_close_tag, 
+                              &pub_key_content); // TODO - make sure to g_free() pub_key_content
+  if (success) 
+  {
+    purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID,
+                 "Public Key received: <START>%s<END>\n",
+                 pub_key_content);
+      
+    // Attempt to store the public key
+    if (add_public_key(pub_key_content, *sender) == FALSE)
+    {
+      purple_debug(PURPLE_DEBUG_ERROR,
+                   PLUGIN_ID,
+                   "Failed to store new key for %s.\n",
+                   *sender);
+      
+      // Notify the user
+      purple_conversation_write(conv, 
+                                NULL, 
+	  					                  "SySecure: You received a public key, but could not store it for some reason. Unfortunately, you cannot talk encrypted. This error should not have occurred, so please contact the developers and help them make sure it does not continue occurring. ",
+	  					                  PURPLE_MESSAGE_ERROR,
+	  					                  stime(NULL));  
+    }
+      
+    // Free everything we have g_malloced before returning
+    g_free(sysecure_content);
+    g_free(pub_key_content);
+    
+    // Don't show the public key announcement message 
+    return TRUE;
+  } 
+  
+  // Process SYSECURE message
+  success = decompose_and_decrypt_message(sysecure_content,
+                                          (unsigned char **)&decrypted_message,
+                                          *sender, 
+                                          acct->username);
+  if (success == FALSE)
+  {  
+       purple_debug(PURPLE_DEBUG_ERROR,
+                    PLUGIN_ID,
+                    "Debug error: Could not parse message <START>%s<END>\n",
+                    sysecure_content);
+                    
+     // Notify the user
+     purple_conversation_write(conv, 
+                               NULL, 
+	 					                  "SySecure: You received an encrypted message, but we were unable to understand the message. This should not have happened. Please contact developers to help ensure it does not continue happening!",
+	 					                  PURPLE_MESSAGE_ERROR,
+  					                  stime(NULL));  
+     
+     // Clean up our memory
+     g_free(sysecure_content);
+     g_free(pub_key_content);
+     
+     // Do not show the encrypted message
+     return TRUE;
+  }
+     
+  // Free the encrypted message, and put the decrypted message in it's place
+  // TODO - make sure this works!
+  g_free(*message);
+  *message = decrypted_message;
+  
+  // Clean up our memory
+  g_free(sysecure_content);
+  g_free(pub_key_content);    
+  
+  // Do show the message now! We have decrypted and swapped it out
+  return FALSE;
 }
 
-void add_tags_to_message (char *open_tag, char *close_tag, char *message, char **result)
+
+/**
+ * Given open and close tags, and the original message, this function returns
+ * the message contained within the tags. 
+ * 
+ * @param open_tag The tag used to start the sequence
+ * @param close_tag The tag used to end the sequence
+ * @param message The message to be wrapped within the open and close tags
+ * @param result An out parameter. Upon completion, this variable will contain
+ *               "open_tagmessageclose_tag". This is freshly allocated inside 
+ *               of this function
+ */
+static void 
+add_tags_to_message (char *open_tag, char *close_tag, char *message, char **result)
 {
-  int message_length = strlen(message) + strlen(open_tag) + strlen(close_tag);
-  char* temp_message = malloc(message_length*sizeof(char));
-  memset(temp_message, 0, message_length);
-  strcat(temp_message, open_tag);
-  strcat(temp_message, message);
-  strcat(temp_message, close_tag);
-  *result = malloc(message_length*sizeof(char));
-  memset(*result, 0, message_length);
-  memcpy(*result, temp_message, message_length + 1);
-  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "add_tags_to_message: RESULT: %s\n", *result);
-  g_free(temp_message);
+  // Need enough space for the open tag, the message, the close tag, and the 
+  // null terminating char
+  int message_length = strlen(message) + strlen(open_tag) + strlen(close_tag) + 1;
   
+  // Allocate and clear
+  *result = g_malloc(message_length * sizeof(char));
+  memset(*result, 0, message_length * sizeof(char));
+  
+  // Put the data
+  strcat(*result, open_tag);
+  strcat(*result, message);
+  strcat(*result, close_tag);
+  
+  purple_debug(PURPLE_DEBUG_INFO,
+               PLUGIN_ID,
+               "Added tags to message. Result: %s\n", *result);
 }
 
-
-//Create_outgoing_msg:  This function builds the outgoing message
-//adding the following:
-//1) Session Key, Encrypted using the receiver's public key
-//2) E(K_Session, Message||E(Priv_Sender, Hash(Message))
-//  -Note that within the encryption this is split into 
-//   ;;MSG;; and ;;E_HASH;;
-//3) The sender's public key.
-
-void create_outgoing_msg (RSA_Key_Pair *key_pair, char **message, char *sender, char *receiver)
+/**
+ * @brief Takes a standard IM message, and converts it to a SySecure message. 
+ *
+ * @details Builds the outgoing SySecure message. Generates a session key, 
+ *          encrypts it with the receiver public key so no one but the receiver
+ *          can decrypt, hash the original message, use the sender private key
+ *          to encrypt the hash. Concatenate the plain text message and the 
+ *          hash, encrypt the concatenated string with the session key. Concat
+ *          the encrypted session key and the encrypted message/hash into a new
+ *          char*, which is now the ready-to-send message. g_free() the original
+ *          message, and assign the sysecure message. While doing these ops, 
+ *          this also wraps the various sysecure message components inside of 
+ *          tags, so they can be correctly extracted on the receiving end
+ *
+ * @param message Both an input and an output parameter. Pass in the original 
+ *                value of the IM message, referenceable as *message. This 
+ *                function will perform the necessary ops to convert this into
+ *                a SySecure message. The passed value will eventually be freed, 
+ *                and a newly g_alloced() value will be returned in *message
+ * @param sender The name of the sender
+ * @param reveiver The name of the receiver
+ *
+ * @todo Add in the hashing function to the encryption
+ * @todo It is not a good convention to have an output param also be an input
+ *       param, because the function may fail in the middle, resulting in neither
+ *       the input data, or the output data existing when it fails. Create 
+ *       another signature for this method
+ */
+static void 
+create_outgoing_msg (unsigned char **message, char *sender, const char *receiver)
 {
   //declare temporary variables
-  char* temp_message;
-  char* temp_message2;
+  char* temp_message;         // holds the wrapped symmetric key and enclosing tags
+  char* temp_message2;        // holds the enclosed encrypted message
   char* temp_message3;
-  char* temp_message4;
-  unsigned char* temp_encrypted_message;
+  unsigned char* temp_encrypted_message;  // The encrypted session key
   char *encrypted_message;
   unsigned int encrypted_msg_length;
-  PK11SymKey *session_key;
+  PK11SymKey *session_key;          // The session key to be used to encrypt this message
   SECItem *wrapped_key;
   char *wrapped_keybuff;
 
-  //1) Add the Session Key, encrypted
+  // Generate the Session Key
   session_key = generate_symmetric_key();
+  
+  // Wrap the symmetric key in the receiver's public key, so only the receiver
+  // can unwrap it
   wrap_symkey(session_key, &wrapped_key, receiver);
+  
+  // Convert the SECItem into an ASCII char* that can be safely sent over IM
   wrapped_keybuff = NSSBase64_EncodeItem(0, 0, 0, wrapped_key);
-  //add ;;S_KEY;; tag to the beginning and end of the encrypted KS
+  
+  // Add tags around the encrypted key, so it can be found and retrieved later
   add_tags_to_message(key_tag, key_close_tag, wrapped_keybuff, &temp_message);
 
-  //purple_debug(PURPLE_DEBUG_INFO, "SySecure", "create_outgoing_msg: temp_message: %s\n", temp_message);
-
-  //2) Add the encrypted message
-  //   Note:  Need to add the hashing function here!
+  // Actually encrypt the session key
   temp_encrypted_message = encrypt(session_key, *message, &encrypted_msg_length);
 
-  //temp_encrypted_message is binary...the function below will convert it to sendable
-  //ASCII code.
+  if (temp_encrypted_message == NULL)
+  {
+   purple_debug(PURPLE_DEBUG_ERROR,
+                PLUGIN_ID,
+                "Unable to encrypt the IM. Unable to continue creating the SySecure IM\n");
+          
+   // TODO - Notify the user here that their send failed :/
+   // TODO - Also, at this point, the unencrypted message would be sent. We should
+   //        probably guard against this
+   
+   // Free the memory we were using
+   g_free(temp_message);
+   
+   return; 
+  }
+
+  // Convert the encrypted message into an ASCII armored format, so that it is 
+  // safe to send over IM
   encrypted_message = BTOA_DataToAscii(temp_encrypted_message, encrypted_msg_length);
+  
+  // TODO - see if we need this memset. Jason had it commented out
   //memset(encrypted_message + encrypted_msg_length, '\0', 1);
+  
+  // Enclose the encrypted message in the correct tags,
   add_tags_to_message(emsg_tag, emsg_close_tag, encrypted_message, &temp_message2);
   
-  //At this point temp_message = ;;S_KEY;;<WRAPPED SESSION KEY>;;/S_KEY;;
-  //              temp_message2 = ;;E_MSG;;<E(SESSION_KEY, MSG)>;;/E_MSG;;
-  temp_message3 = malloc((strlen(temp_message)+strlen(temp_message2))*sizeof(char));
-  memset(temp_message3, 0, strlen(temp_message) + strlen(temp_message2));
+  // ==================================================================
+  // 
+  // At this point temp_message = the enclosed, wrapped session key
+  //              temp_message2 = the enclosed, encrypted message
+  // Now on to putting those two together into a single char *
+  //
+  // ==================================================================  
+  
+  // Create room to store the full SySecure IM content
+  // Size of the packaged session key, plus the encrypted message, plus the null
+  temp_message3 = malloc((strlen(temp_message)+strlen(temp_message2) + 1)*sizeof(char));
+  memset(temp_message3, 0, strlen(temp_message) + strlen(temp_message2) + 1);
   strcat(temp_message3, temp_message);
   strcat(temp_message3, temp_message2);
-  add_tags_to_message(crypt_tag, crypt_close_tag, temp_message3, &temp_message4);
+  
+  // Free the old message, so that we can add the encrypted message to that var
+  g_free(*message);
+ 
+  // Package the entire sysecure message
+  // Note: This is not horribly useful right now, but I guess it could be later?
+  // PS - cheaply avoiding compiler error. Should prob change the func. sig :/
+  add_tags_to_message(crypt_tag, crypt_close_tag, temp_message3, (char **)message);
 
-  //Set temp_message to a concatenation of temp_message and temp_message2
-  free(temp_message);
-  temp_message = malloc (strlen(temp_message4)*sizeof(char));
-  memset(temp_message, 0, strlen(temp_message4));
-  memcpy(temp_message, temp_message4, strlen(temp_message4) + 1);
-  //Now overwrite message so that it reflects all the updates from above.
-  free(*message);
-  *message = malloc(strlen(temp_message)*sizeof(char));
-  memset(*message, 0, strlen(temp_message));
-  memcpy(*message, temp_message, strlen(temp_message) + 1);
-
-/*  //DEBUGGING ONLY
-  char* debug;
-  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "DEBUGGING: temp_message3 <START>%s<END> sender %s\n", temp_message3, sender);
-  process_SYS_message (temp_message3, &debug, sender);
-  //END DEBUGGING*/
-
+  // Free all the temp vars  
   free(temp_message);
   free(temp_message2);
   free(temp_message3);
-  free(temp_message4);
   free(encrypted_message);
+  free(temp_encrypted_message);
   free(wrapped_keybuff);
 }
 
-//SYS_outgoing_cb: prepares for an outgoing message.  Notice that
-//this method checks first for the enabling of SySecure and then
-//checks for the presence of a public key for the intended receiver.
-//If the public key does not exist, then this method will send a request for the key.
-gboolean SYS_outgoing_cb (PurpleAccount *account, const char *receiver, char **message)
+/**
+ * If encryption is enabled for the passed receiver, and if we have the correct
+ * keys for that person, and we have trusted those keys, the we will encrypt
+ * the message and send it to them. 
+ * 
+ * If the public key does not exist, this method will send a request for the key
+ *
+ * @param account The IM account this message is being sent on
+ * @param reveiver The name of the receipient of this message
+ * @param message The original IM message. This variable can be g_free()'d and 
+ *                a new message can be placed in it's stead
+ *
+ *
+ * @todo There are a number of places that we need to prevent this message from
+ *       being sent. Either change it to a default message, or (better) just
+ *       set it to NULL. Not sure if setting to NULL will crash pidgin, so I
+ *       dont want to do that _right_ now (in the middle of major changes, I 
+ *       enough to think a/b w/o introducing new bugs)
+ */
+void 
+sending_im_cb (PurpleAccount *account, const char *receiver, char **message)
 {
 
   //1) Check if SySecure is enabled...if disabled return TRUE to send message
@@ -596,55 +735,143 @@ gboolean SYS_outgoing_cb (PurpleAccount *account, const char *receiver, char **m
   //4) If we made it through these guards then call create_outgoing_msg to put the
   //   message together.
 
-  //Necessary declarations:
+  // Necessary declarations:
   RSA_Key_Pair *key_pair;
-  char* temp_message = malloc(strlen(*message)*sizeof(char));
-  memset(temp_message, 0, strlen(*message));
-  memcpy(temp_message, *message, strlen(*message) + 1);
-  
+  unsigned char* temp_message;    // Used later to copy the message
+  PurpleConversation* conv;   // Used to notify the user of an error by writing
+                              // it to their conversation window
 
-  //Initialize pub_key
+  // We only have something to do if encryption is enabled, and there is a 
+  // message
+  // Note: The message should never be NULL, unless another plugin callback 
+  //       actually NULLed it before it got to us. libpurple never sends NULL
+  if (is_enabled(receiver) == FALSE ||
+      (*message) == NULL)
+  {
+    purple_debug(PURPLE_DEBUG_INFO, 
+                 PLUGIN_ID,
+                 "Encryption disabled for conversation with %s\n",
+                 receiver);
+    return;
+  }
+  
+  // Setup the conv variable, so we can print error messages to the user's
+  // conversation window if need be
+  conv = purple_find_conversation_with_account( PURPLE_CONV_TYPE_IM,
+                                                receiver,
+                                                account);	 
+  if (conv == NULL)
+    conv = purple_conversation_new(PURPLE_CONV_TYPE_IM, 
+                                   account, 
+                                   receiver);
+  
+  
+  // Initialize pub_key
   init_pub_key(account->username);
+  
+  // Make sure we have the receivers public key and can actually encrypt the 
+  // message
+  if (find_key_pair(account->username, &key_pair) == FALSE)
+  {
+    purple_debug(PURPLE_DEBUG_ERROR, 
+                 PLUGIN_ID, 
+                 "No public key found for %s. Unable to encrypt IM message\n",
+                 receiver);
+    
+    // Notify the user
+    purple_conversation_write(conv, 
+                              "SySecure", 
+	  					                "You do not have a public key for this person. You are unable to encrypt the messages you send them. Perhaps try IM'ing them in an unsecure fashion and asking for their public key.",
+	  					                PURPLE_MESSAGE_ERROR,
+	  					                stime(NULL)); 
+   
+   // TODO - set the message to NULL to prevent an unencrypted message from being sent into the network!!
+    
+	  // Do not show the message in the chat window    
+    return;
+  }
+  
+  // Make sure we trust the public key
+  // If we dont, we will not encrypt it, and we will also provide a warning
+  if (key_pair->trusted == FALSE)
+  {
+    purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID,
+                 "%s's public key is not trusted. Will not encrypt and send. Also, printing a warning message.\n", 
+                 receiver);
+    
+    purple_conversation_write(conv, 
+                              "SySecure", 
+	  					                "You do not trust the public key being used by the person you are IMing. An attacker may be able to read messages. SySecure will not send a message to the network if it cannot guarantee that messages safety, therefore we have refused to send this message until you trust the public key. Please turn SySecure off for this IM if you want to talk to this person. ",
+	  					                PURPLE_MESSAGE_ERROR,
+	  					                stime(NULL));
+	  
+	  // TODO - set the message to NULL to prevent an unencrypted message from being sent into the network!!
+    return;   
+  }
+  
+  
+  // Copy the passed message into a temporary variable. 
+  // We do this just in case creating the create_outgoing_msg() fails at some 
+  // point. That method is free to use the pointer you pass it, so we don't
+  // want to accidentally corrupt that. 
+  // TODO - change this to _not_ copy the memory here once we have changed the 
+  //        create_outgoing_msg() params
+  temp_message = g_malloc0((strlen(*message) + 1) *sizeof(char));
+  memcpy(temp_message, *message, strlen(*message));
 
-  //1) SySecure enabled or message NULL?
-  if (!is_enabled(receiver) || !(*message))
-  {
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "SYS_disabled for conversation with %s.\n", receiver);
-    return TRUE;
-  }
-  //2) Do we have the receiver's public key?
-  //if (!(find_key_pair(receiver, &key_pair)))
-  // FOR DEBUGGING ONLY!!!!!
-  if (!(find_key_pair(account->username, &key_pair)))
-  {
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "%s's public key unknown.\n", receiver);
-    return FALSE;
-  }
-  //3) Is the key we have trusted?
-  if (!(key_pair->trusted))
-  {
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "%s's public key unknown.\n", receiver);
-    return FALSE;
-  }
-  //4) SySecure is enabled and we have a trusted key for the receiver.
-  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "%s's public key is known and trusted and SySecure is enabled.\n", receiver);
-  create_outgoing_msg(key_pair, &temp_message, account->username, receiver);
+  // Actually create the SySecure message from the standard IM messsage. 
+  // Store to temp_message
+  create_outgoing_msg(&temp_message, account->username, receiver);
   
-  if (temp_message == 0)
+  if (temp_message == NULL)
   {
-    purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "Error creating message.  Message dropped.\n");
-    return FALSE;
+    purple_debug(PURPLE_DEBUG_ERROR,
+                 PLUGIN_ID,
+                 "Error creating output message. Message dropped.\n");
+                 
+    purple_conversation_write(conv, 
+                              "SySecure", 
+	  					                "Some error in encrypting the message. Please send debug log to developers, so we can identify the issue! Printing message you tried to send to allow you to copy/paste if you would like",
+	  					                PURPLE_MESSAGE_ERROR,
+	  					                stime(NULL));
+	  
+	  purple_conversation_write(conv, 
+                              "Some plugin", 
+	  					                "Some err",
+	  					                PURPLE_MESSAGE_ERROR,
+	  					                stime(NULL));
+	  
+	  purple_conversation_write(conv, 
+                              "SySecure", 
+	  					                *message,
+	  					                PURPLE_MESSAGE_ERROR,
+	  					                stime(NULL));
+	 
+	  // TODO - Do not send unsecure IM into network!
+	  
+    return;
   }
-  free(*message);
-  *message = malloc(strlen(temp_message)*sizeof(char));
-  memset(*message, 0, strlen(temp_message));
-  memcpy(*message, temp_message, strlen(temp_message) + 1);
-  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "TEMP_MSG: %s MESSAGE: %s\n", temp_message, *message);
   
-  return TRUE;
+  // Replace the old message with the encrypted message
+  g_free(*message);
+  *message = g_malloc0((strlen((const char *)temp_message) + 1) *sizeof(char));
+  memcpy(*message, temp_message, strlen((const char *)temp_message));
 }
 
-gboolean send_pub_key (PurpleConversation *conv)
+/**
+ * Handles creating the SySecure message that sends the public key to another 
+ * party. This creates the message, sends it off, and returns. 
+ *
+ * @param conv The conversation we need to send a public key for
+ *
+ * @return seems to always return true. Not sure what this is supposed to 
+ *         indicated
+ *
+ * @todo Figure out what return value indicates
+ */
+gboolean 
+send_pub_key (PurpleConversation *conv)
 {
   RSA_Key_Pair *key_pair;
   SECItem *key_data;
@@ -654,14 +881,25 @@ gboolean send_pub_key (PurpleConversation *conv)
   char* pub_key_message;
   PurpleConnection *connect;
   GList *connect_list;
+  PurpleConvIm * im_data;
+  PurpleMessageFlags flags = PURPLE_MESSAGE_INVISIBLE|PURPLE_MESSAGE_NO_LINKIFY|PURPLE_MESSAGE_RAW|PURPLE_MESSAGE_SEND;
 
-  if (!find_key_pair(conv->account->username, &key_pair))
+  if (find_key_pair(conv->account->username, &key_pair) == FALSE)
   {
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "No key exists for user %s.\n", conv->account->username);
+    purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID, 
+                 "No key exists for user %s, unable to send public key\n",
+                 conv->account->username);
     return TRUE;
   }
+  
+   // Seems to turn the public key into a SECItem, so it can be passed around
    key_data = SECKEY_EncodeDERSubjectPublicKeyInfo(key_pair->pub);
+   
+   // Encode the public key for transmission over IM (ASCII only)
    key_buffer = NSSBase64_EncodeItem(0, 0, 0, key_data);
+   
+   // Add the tags to wrap the public key, and to wrap the entire message
    add_tags_to_message(pub_tag, pub_close_tag, key_buffer, &pub_key_wrap);
    add_tags_to_message(crypt_tag, crypt_close_tag, pub_key_wrap, &pub_key_message);
    //purple_debug(PURPLE_DEBUG_INFO, "SySecure", "User %s's key ready to send: %s\n", conv->account->username, key_buffer);
@@ -670,7 +908,20 @@ gboolean send_pub_key (PurpleConversation *conv)
    connect = (PurpleConnection*) connect_list->data;
    serv_send_im(connect, conv->name, pub_key_message, PURPLE_MESSAGE_SEND);
    
-
+   // Get the IM specific data from conversation
+   im_data = purple_conversation_get_im_data(conv);
+   if (im_data == NULL)
+   {
+      // This was not an IM conversation
+      // TODO - print awesomeish error message
+   }
+   
+   
+   // Actually send the IM
+   purple_conv_im_send_with_flags	(im_data,
+                                   pub_key_message,
+                                   flags);	
+   
    //DEBUG ONLY
    /*key_check = NSSBase64_DecodeBuffer(0, 0, key_buffer, strlen(key_buffer));
    if(SECITEM_ItemsAreEqual(key_data, key_check))
@@ -683,11 +934,23 @@ gboolean send_pub_key (PurpleConversation *conv)
 
 //Upon creation of a new conversation, attempt to immediately
 //send your public key.
+/**
+ * Call back for a new conversation being created. Immediately tries to 
+ * find (or create) the public key that is used for the account this 
+ * conversation is upon, and then sends that public key to the conversation 
+ * receipient. 
+ *
+ * @param conv The conversation that just started
+ */
 void SYS_create_conversation_cb (PurpleConversation *conv)
 {
-  purple_debug(PURPLE_DEBUG_INFO, "SySecure", 
+  purple_debug(PURPLE_DEBUG_INFO,
+               PLUGIN_ID, 
                "New conversation created between user %s and buddy %s.\n", 
-                                         conv->account->username, conv->name);
+               conv->account->username, 
+               conv->name);
+               
+               
   init_pub_key(conv->account->username);
   send_pub_key(conv);
 }

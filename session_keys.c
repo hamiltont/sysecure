@@ -150,7 +150,11 @@ debug_symmetric_key(PK11SymKey * key)
  *                      return it will be set to the length of the output 
  * 
  * @return A newly allocated array, which contains the encrypted data. Length
- *         of encrypted data is stored to result_length                      
+ *         of encrypted data is stored to result_length. Returns NULL if there 
+ *         was an error                   
+ *
+ * @todo Have this function return a gboolean, to be consistent with the code
+ *       in msg_handle  
  */
 // TODO - add better names to some of the internal methods 
 unsigned char * 

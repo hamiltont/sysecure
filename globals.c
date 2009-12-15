@@ -1,5 +1,5 @@
 /**
- * @file
+ * @file globals.c
  * @brief Holds all of the globals needed by many core files in SySecure 
  * 
  * Currently holds the EncryptionInfo structure, and some #defines for PLUGIN
