@@ -46,7 +46,7 @@ void strip_returns (char **init_string);
 
 gboolean pub_key_encrypt (char **enc_msg, char **orig_msg, char *key_val);
 
-gboolean wrap_symkey (PK11SymKey *key, SECItem **key_data, char* name);
+gboolean wrap_symkey (PK11SymKey *key, SECItem **key_data, const char* name);
 
 gboolean unwrap_symkey (SECItem *wrappedKey, char* name, PK11SymKey **unwrapped_key);
 

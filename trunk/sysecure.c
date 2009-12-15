@@ -1,3 +1,11 @@
+/**
+ * @file
+ * @brief Starting location for the project. Handles initializing the plugin
+ * 
+ * Registers the appropriate libpurple and GTK+ (Pidgin) callback functions to 
+ * have SySecure actually do something. 
+ *
+ */
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
@@ -70,9 +78,9 @@ static gboolean plugin_load(PurplePlugin *plugin)
   init_gtk_ui(plugin);
 
   purple_signal_connect(conv_handle, "receiving-im-msg", plugin,
-                        PURPLE_CALLBACK(SYS_incoming_cb), NULL);
+                        PURPLE_CALLBACK(receiving_im_cb), NULL);
   purple_signal_connect(conv_handle, "sending-im-msg", plugin,
-                        PURPLE_CALLBACK(SYS_outgoing_cb), NULL);
+                        PURPLE_CALLBACK(sending_im_cb), NULL);
   purple_signal_connect(conv_handle, "conversation-created", plugin,
                         PURPLE_CALLBACK(SYS_create_conversation_cb), NULL);
   
@@ -118,7 +126,7 @@ static PurplePluginInfo info = {
 
 	PLUGIN_ID,                  /* id */
 	"SySecure",                 /* name */
-	PLUGIN_VERSION,            /* version */
+	PLUGIN_VERSION,             /* version */
 	PLUGIN_SUMMARY,             /* summary */
   PLUGIN_DESC,                /* description */
 	PLUGIN_AUTHOR,              /* author */

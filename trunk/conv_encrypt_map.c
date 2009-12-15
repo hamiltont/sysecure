@@ -29,8 +29,8 @@
  * Also note that this class would need to be totally re-worked if this plugin
  * were trying to support chats, and not just IM's!
  *
- * TODO - right now, this class uses a char * as the key. It would be a lot 
- *        better to use a const char *!
+ * @todo Right now, this class uses a char * as the key. It would be a lot 
+ *       better to use a const char *!
  *
  * 
  */
@@ -65,7 +65,7 @@ static GHashTable *conv_EI = NULL;
  *
  * @param conversation_name The IM name of the person receiving the message
  *
- * TODO - this is not safe if someone has two buddies, on two accounts, that 
+ * @todo this is not safe if someone has two buddies, on two accounts, that 
  *        have the same IM screen name. Should fix this at some point 
  */
 EncryptionInfo *
