@@ -185,7 +185,8 @@ get_msg_component (char *message, char *open_tag, char *close_tag, char **result
   *result = g_malloc((close_ptr - open_ptr + 1) * sizeof(char));
   
   // Copy the component into the result 
-  memset(*result, (int)open_ptr, close_ptr - open_ptr); // cast for compiler warning
+  memset(*result, 0, (close_ptr - open_ptr) + 1);
+  memcpy(*result, open_ptr, close_ptr - open_ptr);
   memset(*result + (close_ptr - open_ptr), '\0', 1);
   
   return TRUE;
@@ -455,10 +456,9 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
                  "Non-encrypted message received.\n"); 
 	
 	  // Just show the message as normal
-	  return FALSE;
+      purple_conversation_write(conv, NULL,*message, PURPLE_MESSAGE_RECV, time(NULL)); 
+	  return TRUE;
   }
-  
-  
   purple_debug(PURPLE_DEBUG_INFO,
                PLUGIN_ID,
                "SySecure message identified.\n"); 
@@ -486,7 +486,6 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
                  PLUGIN_ID,
                  "Public Key received: <START>%s<END>\n",
                  pub_key_content);
-      
     // Attempt to store the public key
     if (add_public_key(pub_key_content, *sender) == FALSE)
     {
@@ -500,9 +499,8 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
                                 NULL, 
 	  					                  "SySecure: You received a public key, but could not store it for some reason. Unfortunately, you cannot talk encrypted. This error should not have occurred, so please contact the developers and help them make sure it does not continue occurring. ",
 	  					                  PURPLE_MESSAGE_ERROR,
-	  					                  stime(NULL));  
+	  					                  time(NULL));  
     }
-      
     // Free everything we have g_malloced before returning
     g_free(sysecure_content);
     g_free(pub_key_content);
@@ -528,7 +526,7 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
                                NULL, 
 	 					                  "SySecure: You received an encrypted message, but we were unable to understand the message. This should not have happened. Please contact developers to help ensure it does not continue happening!",
 	 					                  PURPLE_MESSAGE_ERROR,
-  					                  stime(NULL));  
+  					                  time(NULL));  
      
      // Clean up our memory
      g_free(sysecure_content);
@@ -548,7 +546,7 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
   g_free(pub_key_content);    
   
   // Do show the message now! We have decrypted and swapped it out
-  return FALSE;
+  return TRUE;
 }
 
 
@@ -783,7 +781,7 @@ sending_im_cb (PurpleAccount *account, const char *receiver, char **message)
                               "SySecure", 
 	  					                "You do not have a public key for this person. You are unable to encrypt the messages you send them. Perhaps try IM'ing them in an unsecure fashion and asking for their public key.",
 	  					                PURPLE_MESSAGE_ERROR,
-	  					                stime(NULL)); 
+	  					                time(NULL)); 
    
    // TODO - set the message to NULL to prevent an unencrypted message from being sent into the network!!
     
@@ -804,7 +802,7 @@ sending_im_cb (PurpleAccount *account, const char *receiver, char **message)
                               "SySecure", 
 	  					                "You do not trust the public key being used by the person you are IMing. An attacker may be able to read messages. SySecure will not send a message to the network if it cannot guarantee that messages safety, therefore we have refused to send this message until you trust the public key. Please turn SySecure off for this IM if you want to talk to this person. ",
 	  					                PURPLE_MESSAGE_ERROR,
-	  					                stime(NULL));
+	  					                time(NULL));
 	  
 	  // TODO - set the message to NULL to prevent an unencrypted message from being sent into the network!!
     return;   
@@ -834,19 +832,19 @@ sending_im_cb (PurpleAccount *account, const char *receiver, char **message)
                               "SySecure", 
 	  					                "Some error in encrypting the message. Please send debug log to developers, so we can identify the issue! Printing message you tried to send to allow you to copy/paste if you would like",
 	  					                PURPLE_MESSAGE_ERROR,
-	  					                stime(NULL));
+	  					                time(NULL));
 	  
 	  purple_conversation_write(conv, 
                               "Some plugin", 
 	  					                "Some err",
 	  					                PURPLE_MESSAGE_ERROR,
-	  					                stime(NULL));
+	  					                time(NULL));
 	  
 	  purple_conversation_write(conv, 
                               "SySecure", 
 	  					                *message,
 	  					                PURPLE_MESSAGE_ERROR,
-	  					                stime(NULL));
+	  					                time(NULL));
 	 
 	  // TODO - Do not send unsecure IM into network!
 	  
@@ -903,10 +901,10 @@ send_pub_key (PurpleConversation *conv)
    add_tags_to_message(pub_tag, pub_close_tag, key_buffer, &pub_key_wrap);
    add_tags_to_message(crypt_tag, crypt_close_tag, pub_key_wrap, &pub_key_message);
    //purple_debug(PURPLE_DEBUG_INFO, "SySecure", "User %s's key ready to send: %s\n", conv->account->username, key_buffer);
-
-   connect_list = purple_connections_get_all();
-   connect = (PurpleConnection*) connect_list->data;
-   serv_send_im(connect, conv->name, pub_key_message, PURPLE_MESSAGE_SEND);
+   
+   //connect_list = purple_connections_get_all();
+   //connect = (PurpleConnection*) connect_list->data;
+   //serv_send_im(connect, conv->name, pub_key_message, PURPLE_MESSAGE_SEND);
    
    // Get the IM specific data from conversation
    im_data = purple_conversation_get_im_data(conv);
