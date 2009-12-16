@@ -270,6 +270,35 @@ generate_RSA_Key_Pair (RSA_Key_Pair** key)
 }
 
 /**
+ * Given a public key item, turns it into a string that can be printed nicely. 
+ * There is likely a NSS call to do something similar, but no one can find it. 
+ * This call does not check for a 
+ *
+ * @param pub The public key to be converted to a printable format. This is 
+ *            assumed to be a correct key, alloced and all.
+ * @param key_string An out parameter. The armored public key data will be 
+ *                   stored here. This will never be NULL after returning, it
+ *                   will be set to a blank string if an error occurs.
+ */
+void 
+generate_pubkeystring (SECKEYPublicKey* pub, char **key_string)
+{
+  SECItem *key_item;
+  if (!pub)
+  {
+    // Only a null term character
+    *key_string = g_malloc0(sizeof(char));
+    return;
+  }
+  
+  key_item = SECKEY_EncodeDERSubjectPublicKeyInfo(pub);
+  *key_string = NSSBase64_EncodeItem(0, 0, 0, key_item);
+  
+  if (*key_string == NULL)
+    *key_string = g_malloc0(sizeof(char));
+}
+
+/**
  * Makes sure there is a public / private key for the current user. If not, 
  * this generates the key pair. This method should only be passed an id of the 
  * local user. If you are looking for the key pair associated with a remote 
@@ -369,36 +398,6 @@ nss_init (void)
     return FALSE;
   }
 }
-
-/**
- * Given a public key item, turns it into a string that can be printed nicely. 
- * There is likely a NSS call to do something similar, but no one can find it. 
- * This call does not check for a 
- *
- * @param pub The public key to be converted to a printable format. This is 
- *            assumed to be a correct key, alloced and all.
- * @param key_string An out parameter. The armored public key data will be 
- *                   stored here. This will never be NULL after returning, it
- *                   will be set to a blank string if an error occurs.
- */
-void 
-generate_pubkeystring (SECKEYPublicKey* pub, char **key_string)
-{
-  SECItem *key_item;
-  if (!pub)
-  {
-    // Only a null term character
-    *key_string = g_malloc0(sizeof(char));
-    return;
-  }
-  
-  key_item = SECKEY_EncodeDERSubjectPublicKeyInfo(pub);
-  *key_string = NSSBase64_EncodeItem(0, 0, 0, key_item);
-  
-  if (*key_string == NULL)
-    *key_string = g_malloc0(sizeof(char));
-}
-
 
 gboolean pub_key_encrypt (char **enc_msg, char **orig_msg, char *key_val)
 {
