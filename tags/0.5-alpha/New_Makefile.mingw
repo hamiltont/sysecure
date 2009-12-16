@@ -1,0 +1,184 @@
+# This Makefile is based in large off of the Makefile found in the Pidgin
+# 'albums' plugin, which is now part of the Pidgin PluginPack
+
+# If you're building on Windows, set this to 1.
+WINDOWS ?= 1
+
+# This is the location where the plugin will be installed. Modify this if you
+# want to install the plugin system-wide.
+ifeq ($(WINDOWS),0)
+
+  # *nix Plugin Directory Settings
+
+  PLUGINDIR=$(HOME)/.purple/plugins
+
+else
+
+  # Windows Plugin Directory Settings
+  PIDGIN_TREE_TOP := ../../..
+  include $(PIDGIN_TREE_TOP)/libpurple/win32/global.mak
+  NSS_TOP := ../../../../win32-dev/nss-3.11.4
+  NSPR_TOP := ../../../../win32-dev/nspr-4.6.4
+  SYSECURE_TOP := ./
+
+  PLUGINDIR="$(HOME)/Application Data/.purple/plugins"
+
+  # Sample system-wide plugin directory:
+  #PLUGINDIR="/cygdrive/c/Program Files/Gaim/plugins"
+
+endif
+
+# This only matters on Windows.
+GAIM_SOURCE_DIR=../gaim
+GTK_TOP=../../../../win32-dev/gtk_2_0
+
+# DO NOT EDIT BELOW THIS LINE
+
+PACKAGE=sysecure
+VERSION=0.1
+#nss_oaep.o nss_mgf1.o
+SOURCES = sysecure.o globals.o conv_encrypt_map.o gtk_ui.o
+SOURCES_O = globals.o conv_encrypt_map.o gtk_ui.o msg_handle.o pub_key.o session_keys.o nss_oaep.o nss_mgf1.o
+SOURCES_C = globals.c conv_encrypt_map.c gtk_ui.c msg_handle.c pub_key.c session_keys.c nss_oaep.c nss_mgf1.c
+          
+#UI=$(PACKAGE)-ui
+PACKDIR=/tmp/pidgin-$(PACKAGE)-$(VERSION)
+
+ifeq ($(WINDOWS),0)
+	TARBALL=$(shell pwd)/../pidgin-$(PACKAGE)-$(VERSION).tar.bz2
+	ARCHIVER=tar --exclude=.cvsignore -cjf
+	ARCHIVER_END=
+else
+	TARBALL=$(shell pwd)/../pidgin-$(PACKAGE)-$(VERSION).zip
+	ARCHIVER=zip -r -9
+	ARCHIVER_END=-x pidgin-$(PACKAGE)-$(VERSION)/.cvsignore
+endif
+
+# Common Compiler Stuff
+CC=gcc
+DEFINES=-DPACKAGE=\"$(PACKAGE)\" -DVERSION=\"$(VERSION)\"
+CFLAGS ?= -g3 -O2 -Wall
+override CFLAGS += $(DEFINES)
+
+ifeq ($(WINDOWS),0)
+
+  # *nix Compiler Stuff
+  PIDGIN_CFLAGS=$(shell pkg-config --cflags pidgin) $(shell pkg-config --cflags gtk+-2.0) -DDATADIR=\"$(shell pkg-config --variable=datadir pidgin)\"
+  PIDGIN_LDFLAGS=$(shell pkg-config --libs pidgin) $(shell pkg-config --libs gtk+-2.0)
+  override CFLAGS += $(PIDGIN_CFLAGS) -fPIC
+  override LDFLAGS += $(PIDGIN_LDFLAGS) -fPIC
+  SHARED_OBJECT_SUFFIX=.so
+
+else
+
+  # Windows Compiler Stuff
+
+  WIN32_CFLAGS= -I"$(GTK_TOP)/include/atk-1.0" \
+                -I"$(GTK_TOP)/include/glib-2.0" \
+                -I"$(GTK_TOP)/include/gtk-2.0" \
+                -I"$(GTK_TOP)/include/freetype2" \
+                -I"$(GTK_TOP)/include/libpng13" \
+                -I"$(GTK_TOP)/include/pango-1.0" \
+                -I"$(GTK_TOP)/lib/glib-2.0/include" \
+                -I"$(GTK_TOP)/lib/gtk-2.0/include" \
+                -I"$(GAIM_SOURCE_DIR)/libgaim" \
+                -I"$(GAIM_SOURCE_DIR)/gtk" \
+                -I"$(GAIM_SOURCE_DIR)/gtk/win32" \
+                -I"$(PIDGIN_TREE_TOP)" \
+                -I"$(PURPLE_TOP)" \
+                -I"$(PURPLE_TOP)/win32" \
+                -I"$(PIDGIN_TOP)" \
+                -I"$(PIDGIN_TOP)/win32" \
+                -I"$(NSS_TOP)/include" \
+                -I"$(SYSECURE_TOP)" \
+                -I"$(NSPR_TOP)/include" \
+		-mno-cygwin -mms-bitfields \
+                $(CFLAGS)
+
+LIB_PATHS +=		-L$(GTK_TOP)/lib \
+			-L$(PURPLE_TOP) \
+			-L$(PIDGIN_TOP) \
+			-L$(NSS_TOP)/lib \
+			-L$(NSPR_TOP)/lib
+
+  WIN32_LIBS=   -lgtk-win32-2.0 \
+                -lglib-2.0 \
+                -lgdk-win32-2.0 \
+                -lgobject-2.0 \
+                -lgmodule-2.0 \
+                -lgdk_pixbuf-2.0 \
+                -lpango-1.0 \
+                -lintl \
+                -lws2_32 \
+                -lpurple \
+                -lpidgin \
+                -lnss3 \
+                -lnspr4 \
+                 -lssl3
+
+  SHARED_OBJECT_SUFFIX=.dll
+
+endif
+
+all: build
+build: $(PACKAGE)$(SHARED_OBJECT_SUFFIX)	# Builds all components of the package
+rebuild: clean build	# Builds all components of the package from scratch
+install: build		# Installs the plugin in $(PLUGINDIR)
+	mkdir -p $(PLUGINDIR)
+	rm -f $(PLUGINDIR)/$(PACKAGE)$(SHARED_OBJECT_SUFFIX)
+	cp $(PACKAGE)$(SHARED_OBJECT_SUFFIX) $(PLUGINDIR)
+package:		# Builds the distribution package from this
+	test ! -f "$(TARBALL)" || rm -f "$(TARBALL)"
+	test ! -d "$(PACKDIR)" || rm -rf "$(PACKDIR)"
+	cp -rL . "$(PACKDIR)"
+	chmod u+w "$(PACKDIR)"
+	cd "$(PACKDIR)" && make distclean
+	-test $(WINDOWS) -ne 0 && cd "$(PACKDIR)" && make TOPDIR="$(shell cygpath.exe --windows `pwd`)/" && rm -f $(PACKAGE).dll.o
+	cd "$(PACKDIR)/.." && $(ARCHIVER) "$(TARBALL)" "$(shell basename $(PACKDIR))" $(ARCHIVER_END)
+	rm -rf "$(PACKDIR)"
+	-gpg --armor --detach-sign "$(TARBALL)"
+	rm -f ~/src/RPM/RPMS/i386/pidgin-$(PACKAGE)-$(VERSION)-0.i386.rpm
+	-test $(WINDOWS) -eq 0 && rpmbuild -ta "$(TARBALL)"
+	-test $(WINDOWS) -eq 0 && rpm --resign ~/src/RPM/RPMS/i386/pidgin-$(PACKAGE)-$(VERSION)-0.i386.rpm
+	-test $(WINDOWS) -eq 0 && rpm --resign ~/src/RPM/RPMS/i386/pidgin-$(PACKAGE)-debuginfo-$(VERSION)-0.i386.rpm
+	-test $(WINDOWS) -eq 0 && rpm --resign ~/src/RPM/SRPMS/pidgin-$(PACKAGE)-$(VERSION)-0.src.rpm
+clean:			# Removes all generated files
+	rm -f *$(SHARED_OBJECT_SUFFIX) *.o
+distclean: clean	# Preparse the directory for distribution
+	rm -rf .svn *~ .#* *.bak *.old *.orig *.rej
+help:			# Displays usage information
+	@sed -ne 's/^\([a-z]*\):.*# /\1\t- /p' Makefile
+
+$(PACKAGE).so: $(PACKAGE).o $(SOURCES)
+	$(LINK.o) --shared $^ $(LOADLIBES) $(LDLIBS) -o $@
+
+globals.o : globals.c globals.h
+	$(CC) $(WIN32_CFLAGS) -o globals.o -c globals.c
+
+conv_encrypt_map.o : conv_encrypt_map.c conv_encrypt_map.h
+	$(CC) $(WIN32_CFLAGS) -o conv_encrypt_map.o -c conv_encrypt_map.c
+
+gtk_ui.o : gtk_ui.c gtk_ui.h
+	$(CC) $(WIN32_CFLAGS) -o gtk_ui.o -c gtk_ui.c
+
+nss_mgf1.o : nss_mgf1.c nss_mgf1.h
+	$(CC) $(WIN32_CFLAGS) -o nss_mgf1.o -c nss_mgf1.c
+
+nss_oaep.o : nss_oaep.c nss_oaep.h
+	$(CC) $(WIN32_CFLAGS) -o nss_oaep.o -c nss_oaep.c
+
+msg_handle.o : msg_handle.c msg_handle.h
+	$(CC) $(WIN32_CFLAGS) -o msg_handle.o -c msg_handle.c
+
+session_keys.o : session_keys.c session_keys.h
+	$(CC) $(WIN32_CFLAGS) -o session_keys.o -c session_keys.c
+
+pub_key.o : pub_key.c pub_key.h
+	$(CC) $(WIN32_CFLAGS) -o pub_key.o -c pub_key.c
+
+$(PACKAGE).dll: $(PACKAGE).c $(SOURCES_C)
+	$(CC) $(WIN32_CFLAGS) -o $(PACKAGE).o -c $(PACKAGE).c
+	$(CC) -shared $(PACKAGE).o $(SOURCES_O) $(LIB_PATHS) $(WIN32_LIBS) $(DLL_LD_FLAGS) -o $@
+
+.PHONY: all build rebuild package install clean distclean help
+
