@@ -371,7 +371,7 @@ decompose_and_decrypt_message (char* sysecure_content, unsigned char** decrypted
                     binary_enc_message,
                     binary_length, 
                     &message_length);
-  
+
   if (message == NULL)
   {
     purple_debug(PURPLE_DEBUG_ERROR, 
@@ -384,12 +384,18 @@ decompose_and_decrypt_message (char* sysecure_content, unsigned char** decrypted
     
     return FALSE;
   }
-  
+
+  // Add terminating character to message
+  memset(message, '\0', message_length);
+  purple_debug(PURPLE_DEBUG_ERROR, 
+                 PLUGIN_ID, 
+                 "MESSAGE: %s\n", (char*) message);
+
   // Cleanup what we have allocated
   g_free(enc_sess_key);   
   g_free(enc_message);
   g_free(binary_enc_message);
-  
+
   // Actually assign to out param
   *decrypted_message = message;
   
@@ -520,6 +526,7 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
                                           (unsigned char **)&decrypted_message,
                                           *sender, 
                                           acct->username);
+
   if (success == FALSE)
   {  
        purple_debug(PURPLE_DEBUG_ERROR,
@@ -545,14 +552,14 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
   // Free the encrypted message, and put the decrypted message in it's place
   // TODO - make sure this works!
   g_free(*message);
-  *message = decrypted_message;
-  
+  *message = (char *)decrypted_message;
+
   // Clean up our memory
   g_free(sysecure_content);
   //g_free(pub_key_content);    
   
   // Do show the message now! We have decrypted and swapped it out
-  return TRUE;
+  return FALSE;
 }
 
 
