@@ -30,9 +30,9 @@ typedef struct {
   gboolean trusted;
 } RSA_Key_Pair;
 
-gboolean add_public_key (char *pub_key_content, char* id);
+gboolean add_public_key (const char *pub_key_content, const char* id);
 
-gboolean find_key_pair (char * key_val, RSA_Key_Pair** key_pair_ptr);
+gboolean find_key_pair (const char * key_val, RSA_Key_Pair** key_pair_ptr);
 
 void generate_RSA_Key_Pair (RSA_Key_Pair** temp_key);
 

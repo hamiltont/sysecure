@@ -1,98 +1,178 @@
+/**
+ * @file pub_key.c
+ * @brief Allows public key encryption, decryption, and key generation. Also 
+ *        provides symmetric wrapping.   
+ *
+ *
+ * References:
+ *  1) William Tompkins, "Pidgin-Encryption: rsa_nss.c," 
+ *     (http://pidgin-encrypt.sourceforge.net/install.php)
+ * 
+ */
+
 #ifndef PUB_KEY_C
 #define PUB_KEY_C
-
-/*
-*References:
-*  1) William Tompkins, "Pidgin-Encryption: rsa_nss.c," 
-*     (http://pidgin-encrypt.sourceforge.net/install.php)
-*
-*/
 
 //Internal Includes
 #include "pub_key.h"
 
 #include "globals.h"
 
-//SYS_key_ring holds all the public keys collected so far
-//INCLUDING the user's.
-GList* SYS_key_ring = NULL;
+/**
+ * Holds all the key pairs collected so far (including the local user's). 
+ * This is a list of RSA_Key_Pair structs
+ *
+ * @see RSA_Key_Pair
+ */
+static GList* key_ring = NULL;
 
 
-//Given a name and a reference to a GList pointer,
-//sets the pointer to the key-pair identified by 
-//key_val in the SYS_key_ring.
-gboolean find_key_pair (char * key_val, RSA_Key_Pair** key_pair_ptr)
+/**
+ * Finds a RSA_Key_Pair that has the given id. 
+ *
+ * @param key_val Currently this is the value of the id used in the 
+ *                RSA_Key_Pair->id_name, which is set to the username. Note that  
+ *                this would not work for two identical usernames on different 
+ *                accounts. This is setup this way in case the internal 
+ *                structure is changed to a hash. 
+ * @param key_pair_ptr An out parameter. Will be set to the appropriate 
+ *                     RSA_Key_Pair
+ *
+ * @returns TRUE if the passed key_val was found and key_pair_ptr was set, 
+ *          FALSE otherwise
+ */
+gboolean 
+find_key_pair (const char * key_val, RSA_Key_Pair** key_pair_ptr)
 {
-  GList *temp_ptr = SYS_key_ring;
-  gboolean found = FALSE;
-  if (!SYS_key_ring)
+  // Declare vars
+  GList *temp_ptr;
+  
+  // Is it even worth our time?
+  if (!key_ring)
   {
     key_pair_ptr = NULL;
     return FALSE;
   }
+  
+  // Init vars
+  temp_ptr = key_ring;
+  
+  // Look for the correct RSA
   while (temp_ptr != NULL)
   {
     *key_pair_ptr = (RSA_Key_Pair*)(temp_ptr->data);
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "looking at key with id: %s.\n", (*key_pair_ptr)->id_name);
-    if (!(strcmp((*key_pair_ptr)->id_name, key_val)))
+    
+    purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID,
+                 "looking at key with id: %s\n",
+                 (*key_pair_ptr)->id_name);
+                 
+    if (strcmp((*key_pair_ptr)->id_name, key_val) == 0)
     {
-      purple_debug(PURPLE_DEBUG_INFO, "SySecure", "temp_key->id: %s equals name: %s.\n", (*key_pair_ptr)->id_name, key_val);
-      found = TRUE;
+      purple_debug(PURPLE_DEBUG_INFO,
+                   PLUGIN_ID,
+                   "temp_key->id: %s equals name: %s.\n",
+                   (*key_pair_ptr)->id_name, 
+                   key_val);
       return TRUE;
     }
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "temp_key->id: %s does not equal name: %s.\n", (*key_pair_ptr)->id_name, key_val);
+    purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID,
+                 "temp_key->id: %s does not equal name: %s.\n", 
+                 (*key_pair_ptr)->id_name, 
+                 key_val);
     
     temp_ptr = g_list_next(temp_ptr);
   }
-  //If not found, need to clear the pointer.
-  if (!found)
-  {
-    *key_pair_ptr = NULL;
-    return FALSE;
-  }
-  else
-    return TRUE;
+  
+  // If not found, clear the pointer to make sure they do not use the wrong one
+  *key_pair_ptr = NULL;
+  
+  return FALSE;
 }
 
-gboolean add_public_key (char *pub_key_content, char* id)
+/**
+ * Accepts the content from a public key announcement message, converts it into
+ * a RSA_Key_Pair and stores that (using the passed id as the RSA_Key_Pair id)
+ *
+ * @param pub_key_content The public key content, as it was sent in the IM. This
+ *                        content should be what is enclosed in the tags, and 
+ *                        should not include the enclosing tags
+ * @param id The id used to identify the created RSA_Key_Pair at a later time. 
+ *           For now, this should be the name of the remote user
+ *
+ * @returns TRUE :) You should be sure to check this to make sure no random
+ *          disk errors occurred
+ *
+ * @todo Figure out this return value, or throw it away
+ */
+gboolean 
+add_public_key (const char *pub_key_content, const char* id)
 {
-  SECItem *key_data;
-  CERTSubjectPublicKeyInfo *key_info = 0;
-  SECKEYPublicKey *public_key;
-  RSA_Key_Pair *key_pair = malloc(sizeof(RSA_Key_Pair));
-  RSA_Key_Pair *key_check;
+  SECItem *key_data;                // temp item to pass around raw data in NSS
+  CERTSubjectPublicKeyInfo *key_info;   // temporary certificate. More on this below
+  SECKEYPublicKey *public_key;          // the actual key
+  RSA_Key_Pair *key_pair = g_malloc(sizeof(RSA_Key_Pair)); // the struct we are creating
+  RSA_Key_Pair *key_check;  // var used only as a parameter placeholder
 
   if (find_key_pair(id, &key_check))
   {
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Key exists for %s. Disregarding received public key.\n", id);
-/*
-    RSA_Key_Pair *debug_key;
-    char name[] = "nataliarevenan";
-    find_key_pair(name, &debug_key);
-    if (SECITEM_ItemsAreEqual(SECKEY_EncodeDERSubjectPublicKeyInfo(key_check->pub), SECKEY_EncodeDERSubjectPublicKeyInfo(debug_key->pub)))
-      purple_debug(PURPLE_DEBUG_INFO, "SySecure", "And it was decoded properly %s's key matches %s's key!\n", key_check->id_name, debug_key->id_name);
-    else
-      purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "It was decoded improperly!.\n");
-*/
-    return TRUE;
+    purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID, 
+                 "Key exists for %s. Destroying old public key.\n", 
+                 id);
+                 
+    // Destroy old key to make room for the new
+    // Note: This is not really safe. We should instead wait till the new key
+    //       is ready to be inserted before we delete this one
+    key_ring = g_list_remove(key_ring,
+                             key_check);
+    g_free(key_check);
+                             
+    /**
+      RSA_Key_Pair *debug_key;
+      char name[] = "nataliarevenan";
+      find_key_pair(name, &debug_key);
+      if (SECITEM_ItemsAreEqual(SECKEY_EncodeDERSubjectPublicKeyInfo(key_check->pub), SECKEY_EncodeDERSubjectPublicKeyInfo(debug_key->pub)))
+        purple_debug(PURPLE_DEBUG_INFO, "SySecure", "And it was decoded properly %s's key matches %s's key!\n", key_check->id_name, debug_key->id_name);
+      else
+        purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "It was decoded improperly!.\n");
+    */
   }
   
-  //purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Inside add_public_key(%s, %s).", pub_key_content, id);
-   //Get the public key from the data stream
-   key_data = NSSBase64_DecodeBuffer(0, 0, pub_key_content, strlen(pub_key_content));
-   key_info = SECKEY_DecodeDERSubjectPublicKeyInfo(key_data);
-   public_key = SECKEY_ExtractPublicKey(key_info);
+  // Get the public key from the data stream
+  key_data = NSSBase64_DecodeBuffer(0, 0, pub_key_content, strlen(pub_key_content));
+   
+  // NSS assumes that a public key won't be used w/o a certificate to validate
+  // the key to ID binding. Because we are creating a key from raw data, NSS
+  // wraps it in a temporary certificate, and returns that to us. We promptly
+  // throw it away :) 
+  key_info = SECKEY_DecodeDERSubjectPublicKeyInfo(key_data);
+  public_key = SECKEY_ExtractPublicKey(key_info);
 
-  //Copy the key and append it to the SYS_key_ring
-  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Importing key for %s\n", id);
-  key_pair->id_name = malloc(strlen(id)*sizeof(char));
+  // Copy the key and append it to the key_ring
+  purple_debug(PURPLE_DEBUG_INFO,
+               PLUGIN_ID, 
+               "Importing key for %s\n", 
+               id);
+  
+  // Create and set id_name
+  key_pair->id_name = g_malloc0((strlen(id) + 1) * sizeof(char));
+  memcpy(key_pair->id_name, id, strlen(id));
+  
+  // Auto trust
   key_pair->trusted = TRUE;
-  memset(key_pair->id_name, 0, strlen(id));
-  memcpy(key_pair->id_name, id, strlen(id) + 1);
+  
+  // Set the public key (we should only have _our_ private key)
   key_pair->pub = public_key;
-  SYS_key_ring = g_list_append(SYS_key_ring, key_pair);
-  purple_debug(PURPLE_DEBUG_INFO, "SySecure", "New key created for: %s.\n",
-            key_pair->id_name);
+  
+  // Add the new key
+  key_ring = g_list_append(key_ring, key_pair);
+  
+  purple_debug(PURPLE_DEBUG_INFO,
+               PLUGIN_ID, 
+               "New key created for: %s.\n",
+               key_pair->id_name);
   
   return TRUE;
 }
@@ -129,7 +209,7 @@ void init_pub_key (char* key_val)
   //GList* temp_ptr;
 
   //set temp_ptr to the head of the key ring
-  //temp_ptr = SYS_key_ring;
+  //temp_ptr = key_ring;
   
   //if key exists, temp_ptr will point to it
   //otherwise it will be NULL and the key will
@@ -143,7 +223,7 @@ void init_pub_key (char* key_val)
     temp_key->trusted = TRUE;
     memset(temp_key->id_name, 0, strlen(key_val));
     memcpy(temp_key->id_name, key_val, strlen(key_val) + 1);
-    SYS_key_ring = g_list_append(SYS_key_ring, temp_key);
+    key_ring = g_list_append(key_ring, temp_key);
     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "New key created for: %s.\n",
              temp_key->id_name);
   }
