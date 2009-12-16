@@ -11,6 +11,8 @@
 //Internal Includes
 #include "pub_key.h"
 
+#include "globals.h"
+
 //SYS_key_ring holds all the public keys collected so far
 //INCLUDING the user's.
 GList* SYS_key_ring = NULL;
@@ -36,7 +38,7 @@ gboolean find_key_pair (char * key_val, RSA_Key_Pair** key_pair_ptr)
     {
       purple_debug(PURPLE_DEBUG_INFO, "SySecure", "temp_key->id: %s equals name: %s.\n", (*key_pair_ptr)->id_name, key_val);
       found = TRUE;
-      return;
+      return TRUE;
     }
     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "temp_key->id: %s does not equal name: %s.\n", (*key_pair_ptr)->id_name, key_val);
     
@@ -305,7 +307,16 @@ gboolean unwrap_symkey (SECItem *wrappedKey, char* name, PK11SymKey **unwrapped_
     return FALSE;
   }
 
-  *unwrapped_key = PK11_PubUnwrapSymKey(key_pair->priv, wrappedKey, CKM_AES_CBC_PAD, CKA_ENCRYPT, 0);
+  *unwrapped_key = PK11_PubUnwrapSymKey(key_pair->priv, wrappedKey, CKM_AES_CBC_PAD, CKA_UNWRAP, 16);
+  
+  if (*unwrapped_key == NULL)
+  {
+    purple_debug(PURPLE_DEBUG_ERROR,
+                 PLUGIN_ID,
+                 "Unable to unwrap symmetric key\n");
+    return FALSE;
+  }
+  
   return TRUE;
 }
 

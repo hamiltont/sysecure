@@ -371,6 +371,7 @@ decompose_and_decrypt_message (char* sysecure_content, unsigned char** decrypted
                     binary_enc_message,
                     binary_length, 
                     &message_length);
+  
   if (message == NULL)
   {
     purple_debug(PURPLE_DEBUG_ERROR, 
@@ -548,7 +549,7 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
   
   // Clean up our memory
   g_free(sysecure_content);
-  g_free(pub_key_content);    
+  //g_free(pub_key_content);    
   
   // Do show the message now! We have decrypted and swapped it out
   return TRUE;
