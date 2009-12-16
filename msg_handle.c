@@ -152,7 +152,7 @@ get_tag_location (char *message, char *tag)
  *
  */
 static gboolean 
-get_msg_component (char *message, char *open_tag, char *close_tag, char **result)
+get_msg_component (const char *message, char *open_tag, char *close_tag, char **result)
 {
   // Declare vars
   char *open_ptr = NULL;
@@ -466,6 +466,8 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
                PLUGIN_ID,
                "SySecure tag includes: <START>%s<END>\n",
                sysecure_content);
+               
+  fprintf(stderr, "ss_content: %s\n",sysecure_content);
    
   // ============================================================
   // 
@@ -480,6 +482,9 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
                               pub_tag, 
                               pub_close_tag, 
                               &pub_key_content); // TODO - make sure to g_free() pub_key_content
+                              
+  fprintf(stderr, "ss_content: %s\n",sysecure_content);
+  
   if (success) 
   {
     purple_debug(PURPLE_DEBUG_INFO,
