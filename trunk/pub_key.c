@@ -221,126 +221,184 @@ add_public_key (const char *pub_key_content, const char* id)
   return TRUE;
 }
 
-void generate_RSA_Key_Pair (RSA_Key_Pair** temp_key)
+/**
+ * Generates a new RSA Key Pair. Only used for the local client
+ *
+ * @param key The out parameter where the generated RSA_Key_Pair will be stored
+ * 
+ * @returns TRUE if the key was generated and stored in key, FALSE otherwise
+ */
+static gboolean
+generate_RSA_Key_Pair (RSA_Key_Pair** key)
 {
-  PK11SlotInfo *slot = 0;
+  PK11SlotInfo *slot;
   PK11RSAGenParams rsaParams;
+  
+  // Standard RSA Ky size
   rsaParams.keySizeInBits = 1024;
+  
+  // Standard RSA public key exponent
   rsaParams.pe = 65537L;
-  *temp_key = malloc (sizeof(RSA_Key_Pair));
+
+  // Make room for the key
+  *key = g_malloc0(sizeof(RSA_Key_Pair));
+
+  // TODO - change to get best slot, not internal slot
   slot = PK11_GetInternalKeySlot();
 
-  (*temp_key)->priv = PK11_GenerateKeyPair(slot, CKM_RSA_PKCS_KEY_PAIR_GEN, &rsaParams,
-               &((*temp_key)->pub), PR_FALSE, PR_FALSE, 0);
+  // Generate key. Strangely, you pass in the public key pointer to get set, and
+  // it returns the private key pointer
+  (*key)->priv = PK11_GenerateKeyPair(slot, 
+                                      CKM_RSA_PKCS_KEY_PAIR_GEN, 
+                                      &rsaParams,
+                                      &((*key)->pub),  
+                                      PR_FALSE, 
+                                      PR_FALSE, 
+                                      0);
 
-  if ((*temp_key)->priv != NULL)
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "generate_RSA_Key_Pair: priv Key Exists!");
-  else
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "generate_RSA_Key_Pair: priv Key DOES NOT Exist!");
-  return;
+  if ((*key)->priv == NULL)
+  {   
+    purple_debug(PURPLE_DEBUG_ERROR,
+                 PLUGIN_ID, 
+                 "Error when generating private key, unable to continue!\n");
+                 
+    g_free(*key);
+    return FALSE;
+  }
+  
+  return TRUE;
 }
 
 /**
+ * Makes sure there is a public / private key for the current user. If not, 
+ * this generates the key pair. This method should only be passed an id of the 
+ * local user. If you are looking for the key pair associated with a remote 
+ * person, then you should use find_public_key()
+ *
+ * @param key_val The same key_val that is used in the find_key_pair function. 
+ *                As of writing, this is the id of the person we are looking for
  *
  * @todo make this take the PurpleAccount (rather than some random ass char*).
  *       That way we can easily change the mapping later to _anything_ in the 
  *       account, without having to fix all the external dependencies
+ * @todo Should probably ensure that the ID passed in is the ID of the local 
+ *       user only, and no other ID. Otherwise, this function would happily 
+ *       generate a key pair for a remote screen name ;)
  */
-void init_pub_key (char* key_val)
+void 
+init_pub_key (char* key_val)
 {
-  char *key_string;
+  char *key_string;  // Used for converting an existing public key into ascii
   RSA_Key_Pair *temp_key;
-  //GList* temp_ptr;
+  gboolean success;       // used to keep track of success in various places
 
-  //set temp_ptr to the head of the key ring
-  //temp_ptr = key_ring;
-  
-  //if key exists, temp_ptr will point to it
-  //otherwise it will be NULL and the key will
-  //have to be created.
-  //find_key_pair(key_val, &temp_key);
+  // Does a key pair exist for us
   if (!find_key_pair(key_val, &temp_key))
   {
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "No key exists for %s...generating new one...\n", key_val);
-    generate_RSA_Key_Pair(&temp_key);
-    temp_key->id_name = malloc(strlen(key_val)*sizeof(char));
-    temp_key->trusted = TRUE;
-    memset(temp_key->id_name, 0, strlen(key_val));
-    memcpy(temp_key->id_name, key_val, strlen(key_val) + 1);
-    key_ring = g_list_append(key_ring, temp_key);
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "New key created for: %s.\n",
-             temp_key->id_name);
-  }
-  else
-  {
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Key exists for %s.\n", key_val);
-    generate_pubkeystring(temp_key->pub, &key_string);
-    if (key_string != NULL)
+    purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID,
+                 "No key exists for %s...generating new one...\n",
+                 key_val);
+                 
+    success = generate_RSA_Key_Pair(&temp_key);
+    
+    // Make sure we could create the key
+    if (success == FALSE)
     {
-      purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Key Value is %s\n", key_string);
-      strip_returns(&key_string);
-      purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Key Value without returns %s\n", key_string);
+      purple_debug(PURPLE_DEBUG_ERROR,
+                   PLUGIN_ID,
+                   "Unable to generate a key pair! Unable to continue initializing public key\n");
+      return;
     }
+    
+    // Set the key values (pub an priv key are set for us)
+    temp_key->id_name = g_malloc0((strlen(key_val) + 1) * sizeof(char));
+    strcpy(temp_key->id_name, key_val); 
+    temp_key->trusted = TRUE;
+    
+    // Add to our key ring
+    key_ring = g_list_append(key_ring, temp_key);
+    purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID, 
+                 "New key created for: %s.\n",
+                 temp_key->id_name);
+                 
+    return;
   }
+  
+  purple_debug(PURPLE_DEBUG_INFO,
+               PLUGIN_ID,
+               "Public Key exists for %s.\n", 
+               key_val);
+  
+  // Store our public key into a string for debugging            
+  generate_pubkeystring(temp_key->pub, &key_string);
+  
+  purple_debug(PURPLE_DEBUG_INFO,
+               PLUGIN_ID, 
+               "Key Value is \n%s\n", 
+               key_string);
+  
 }
 
 //Reference 1: Used REF 1 as a basis for nss_init()
-
-gboolean nss_init (void) 
+/**
+ * Checks to see if the NSS Database is running or not. Currently does nothing
+ * but return FALSE if it is not running. 
+ *
+ * @param void WTF??? I have no idea what this is for :)
+ *
+ * @return TRUE if NSS is primed and ready, FALSE otherwise
+ */
+gboolean 
+nss_init (void) 
 {
-  //gboolean nss_loaded = FALSE;
   PurplePlugin *plugin = purple_plugins_find_with_name("NSS");
   if (plugin)
   {
-    purple_debug(PURPLE_DEBUG_INFO, "SySecure", "NSS is initialized.\n");
+    purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID,
+                 "NSS is initialized. Continuing...\n");
     return TRUE;
   }
   else
   {
-    purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "NSS is not intitialized.\n");
+    purple_debug(PURPLE_DEBUG_ERROR,
+                 PLUGIN_ID,
+                 "NSS is not intitialized. SySecure will likely not load\n");
     return FALSE;
   }
 }
 
-void generate_pubkeystring (SECKEYPublicKey* pub, char **temp_string)
+/**
+ * Given a public key item, turns it into a string that can be printed nicely. 
+ * There is likely a NSS call to do something similar, but no one can find it. 
+ * This call does not check for a 
+ *
+ * @param pub The public key to be converted to a printable format. This is 
+ *            assumed to be a correct key, alloced and all.
+ * @param key_string An out parameter. The armored public key data will be 
+ *                   stored here. This will never be NULL after returning, it
+ *                   will be set to a blank string if an error occurs.
+ */
+void 
+generate_pubkeystring (SECKEYPublicKey* pub, char **key_string)
 {
   SECItem *key_item;
   if (!pub)
   {
-    *temp_string = NULL;
+    // Only a null term character
+    *key_string = g_malloc0(sizeof(char));
     return;
   }
+  
   key_item = SECKEY_EncodeDERSubjectPublicKeyInfo(pub);
-  *temp_string = NSSBase64_EncodeItem(0, 0, 0, key_item);
-  //SECItem_FreeItem(key_item, PR_TRUE);
+  *key_string = NSSBase64_EncodeItem(0, 0, 0, key_item);
+  
+  if (*key_string == NULL)
+    *key_string = g_malloc0(sizeof(char));
 }
 
-void strip_returns (char **init_string)
-{
-  int char_count = 0;
-  int init_length = strlen(*init_string);
-  char ret_str[] = "\n\r";
-  char* pre_string = malloc(strlen(*init_string)*sizeof(char));
-  char* post_string = malloc(strlen(*init_string)*sizeof(char));
-  memset(pre_string, 0, strlen(*init_string));
-  memset(post_string, 0, strlen(*init_string));
-  char_count = strcspn (*init_string, ret_str);
-   while (char_count < strlen(*init_string))
-   {
-     memcpy(pre_string, *init_string, char_count);
-     memcpy(post_string, *init_string + char_count + 1, strlen(*init_string) - char_count - 1);
-     free(*init_string);
-     *init_string = malloc(init_length*sizeof(char));
-     memset(*init_string, 0, init_length);
-     strcat(pre_string, post_string);
-     strcat(*init_string, pre_string);
-     char_count = strcspn (*init_string, ret_str);
-     memset(pre_string, 0, strlen(pre_string));
-     memset(post_string, 0, strlen(post_string));
-   }
-  free(pre_string);
-  free(post_string);
-}
 
 gboolean pub_key_encrypt (char **enc_msg, char **orig_msg, char *key_val)
 {
@@ -395,19 +453,44 @@ gboolean pub_key_encrypt (char **enc_msg, char **orig_msg, char *key_val)
   return TRUE;
 }
 
-gboolean wrap_symkey (PK11SymKey *key, SECItem **key_data, const char* name)
+/**
+ * Wraps a symmetric key in a public key. Only the person with the appropriate
+ * private key can then unwrap the symmetric key. 
+ *
+ * @param key The symmetric key to be wrapped
+ * @param key_data An out parameter. Contains the wrapped key data upon 
+ *                 successful completion. This data is _NOT_ ascii armored, and
+ *                 should be armored before sending via IM
+ * @param name The key_val that is used to find the public key. Currently this 
+ *             is the name of the remote person
+ *
+ * @return TRUE if the public key was found, the symmetric key was wrapped, and
+ *         the data was stored to key_data. FALSE otherwise. 
+ *
+ * @todo Change this to take the Public key, and move the responsibility for 
+ *       finding that to the caller, or use some more obvious input than a 
+ *       random char* called name
+ */
+gboolean 
+wrap_symkey (PK11SymKey *key, SECItem **key_data, const char* name)
 {
   int rv = 0;
   SECItem *data;
   SECStatus s;
   RSA_Key_Pair *key_pair;
-  //find_key_pair(name, &key_pair);
-  if (!find_key_pair(name, &key_pair))
+  
+  // Do we have the key?
+  if (find_key_pair(name, &key_pair) == FALSE)
   {
-    purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "wrap_symkey: Key for %s not found.", name);
+    purple_debug(PURPLE_DEBUG_ERROR, 
+                 PLUGIN_ID, 
+                 "Unable to find a public key for %s. Unable to continue wrapping the symmetric key.\n", 
+                 name);
+                 
     return FALSE;
   }
-  data = (SECItem *) malloc(sizeof(SECItem));
+  
+  data = (SECItem *) g_malloc0(sizeof(SECItem));
   data->len = SECKEY_PublicKeyStrength(key_pair->pub);
   data->data = malloc(data->len * sizeof(char));
   s = PK11_PubWrapSymKey(CKM_RSA_PKCS, key_pair->pub, key, data);
@@ -415,23 +498,53 @@ gboolean wrap_symkey (PK11SymKey *key, SECItem **key_data, const char* name)
   return TRUE;
 }
 
-gboolean unwrap_symkey (SECItem *wrappedKey, char* name, PK11SymKey **unwrapped_key)
+/**
+ * Unwraps a symmetric key with the local private key 
+ *
+ * @param wrappedkey The symmetric key to be unwrapped
+ * @param unwrapped_key An out parameter. Contains the wrapped key data upon 
+ *                      successful completion. This data is _NOT_ ascii armored,
+ *                      and should be armored before sending via IM
+ * @param name The key_val that is used to find the public key. Currently this 
+ *             is the name of the local account that we want to use the priv key
+ *
+ * @return TRUE if the private key was found, the symmetric key was unwrapped, 
+ *         the data was stored to unwrapped_key. FALSE otherwise. 
+ *
+ * @todo Change this to take the Private key, and move the responsibility for 
+ *       finding that to the caller, or use some more obvious input than a 
+ *       random char* called name
+ */
+gboolean 
+unwrap_symkey (SECItem *wrappedKey, char* name, PK11SymKey **unwrapped_key)
 {
-  //GList *temp_ptr;
   RSA_Key_Pair *key_pair;
-  //find_key_pair(name, &key_pair);
+  
+  // Do we have the key? 
   if (!find_key_pair(name, &key_pair))
   {
-    purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "unwrap_symkey: Key pair for %s not found.", name);
+    purple_debug(PURPLE_DEBUG_ERROR,
+                 PLUGIN_ID, 
+                 "unwrap_symkey: Key pair for %s not found.",
+                 name);
     return FALSE;
   }
+  
+  // Do we have the private key? 
   if (key_pair->priv == NULL)
   {
-    purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "unwrap_symkey: Privat Key for %s not found.", name);
+    purple_debug(PURPLE_DEBUG_ERROR,
+                 PLUGIN_ID, 
+                 "unwrap_symkey: Private Key for %s not found.", 
+                 name);
     return FALSE;
   }
 
-  *unwrapped_key = PK11_PubUnwrapSymKey(key_pair->priv, wrappedKey, CKM_AES_CBC_PAD, CKA_UNWRAP, 16);
+  *unwrapped_key = PK11_PubUnwrapSymKey(key_pair->priv,
+                                        wrappedKey, 
+                                        CKM_AES_CBC_PAD, 
+                                        CKA_UNWRAP, 
+                                        16);            // TODO key size should probs not be fixed at 16
   
   if (*unwrapped_key == NULL)
   {
@@ -444,7 +557,16 @@ gboolean unwrap_symkey (SECItem *wrappedKey, char* name, PK11SymKey **unwrapped_
   return TRUE;
 }
 
-PRBool compare_symkeys (PK11SymKey *key1, PK11SymKey *key2)
+/**
+ * Compares two symmetric keys for equality. 
+ *
+ * @param key1 The first key
+ * @param key2 The second
+ * 
+ * @return TRUE if the data of the two keys are equal, FALSE otherwise
+ */
+PRBool 
+compare_symkeys (PK11SymKey *key1, PK11SymKey *key2)
 {
   SECItem *raw_key1 = 0;
   SECItem *raw_key2 = 0;

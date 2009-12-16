@@ -34,13 +34,9 @@ gboolean add_public_key (const char *pub_key_content, const char* id);
 
 gboolean find_key_pair (const char * key_val, RSA_Key_Pair** key_pair_ptr);
 
-void generate_RSA_Key_Pair (RSA_Key_Pair** temp_key);
-
 void init_pub_key (char* name);
 
 gboolean nss_init (void);
-
-void generate_pubkeystring (SECKEYPublicKey* pub, char **temp_string);
 
 void strip_returns (char **init_string);
 
