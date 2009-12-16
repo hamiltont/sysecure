@@ -172,22 +172,21 @@ get_msg_component (const char *message, char *open_tag, char *close_tag, char **
     return FALSE;
   }
 
+  // Skip the actual open_tag, we don't care about that!
+  open_ptr = open_ptr + strlen(open_tag);
+  
   purple_debug(PURPLE_DEBUG_MISC,
                PLUGIN_ID,
                "Found a component in message. First value in component value is '%c', last is '%c'.\n",
                *open_ptr,
-               *close_ptr);
+               *close_ptr - sizeof(char));
                
-  // Skip the actual open_tag, we don't care about that!
-  open_ptr = open_ptr + strlen(open_tag);
   
   // Malloc enough to hold the entire component, plus a null-terminating
-  *result = g_malloc((close_ptr - open_ptr + 1) * sizeof(char));
+  *result = g_malloc0((close_ptr - open_ptr + 1) * sizeof(char));
   
   // Copy the component into the result 
-  memset(*result, 0, (close_ptr - open_ptr) + 1);
   memcpy(*result, open_ptr, close_ptr - open_ptr);
-  memset(*result + (close_ptr - open_ptr), '\0', 1);
   
   return TRUE;
 }
@@ -488,7 +487,7 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
   success = get_msg_component(sysecure_content, 
                               pub_tag, 
                               pub_close_tag, 
-                              &pub_key_content); // TODO - make sure to g_free() pub_key_content
+                              &pub_key_content); // TODO - figure out why calling g_free() on this seg faults
                               
   fprintf(stderr, "ss_content: %s\n",sysecure_content);
   
@@ -515,7 +514,7 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
     }
     // Free everything we have g_malloced before returning
     g_free(sysecure_content);
-    g_free(pub_key_content);
+    //g_free(pub_key_content);
     
     // Don't show the public key announcement message 
     return TRUE;
@@ -543,7 +542,7 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
      
      // Clean up our memory
      g_free(sysecure_content);
-     g_free(pub_key_content);
+     //g_free(pub_key_content);
      
      // Do not show the encrypted message
      return TRUE;
@@ -636,16 +635,45 @@ create_outgoing_msg (unsigned char **message, char *sender, const char *receiver
   PK11SymKey *session_key;          // The session key to be used to encrypt this message
   SECItem *wrapped_key;
   char *wrapped_keybuff;
+  gboolean success; // used to indicate success at various points
 
   // Generate the Session Key
   session_key = generate_symmetric_key();
   
   // Wrap the symmetric key in the receiver's public key, so only the receiver
   // can unwrap it
-  wrap_symkey(session_key, &wrapped_key, receiver);
+  success = wrap_symkey(session_key, &wrapped_key, receiver);
   
+  // Ensure the wrapping was a success 
+  if (success == FALSE)
+  {
+     purple_debug(PURPLE_DEBUG_ERROR,
+                  PLUGIN_ID,
+                  "Unable to wrap the session key. Unable to continue creating the SySecure IM\n");
+     
+     // TODO - Notify the user here that their send failed :/
+     // TODO - Also, at this point, the unencrypted message would be sent. We should
+     //        probably guard against this
+     
+     return;  
+  }
+    
   // Convert the SECItem into an ASCII char* that can be safely sent over IM
   wrapped_keybuff = NSSBase64_EncodeItem(0, 0, 0, wrapped_key);
+  
+  // Ensure the encoding was a success
+  if (wrapped_keybuff == NULL)
+  {
+     purple_debug(PURPLE_DEBUG_ERROR,
+                  PLUGIN_ID,
+                  "Unable to encode the session key. Unable to continue creating the SySecure IM\n");
+     
+     // TODO - Notify the user here that their send failed :/
+     // TODO - Also, at this point, the unencrypted message would be sent. We should
+     //        probably guard against this
+     
+     return;
+  }
   
   // Add tags around the encrypted key, so it can be found and retrieved later
   add_tags_to_message(key_tag, key_close_tag, wrapped_keybuff, &temp_message);
