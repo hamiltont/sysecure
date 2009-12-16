@@ -49,7 +49,7 @@ generate_symmetric_key()
   // then someone has to pad the input with some extra data. We add _PAD to 
   // inform NSS that it should handle this padding for us, we don't want to 
   // manage it ourself
-  CK_MECHANISM_TYPE keygenMech = CKM_DES_CBC_PAD;
+  CK_MECHANISM_TYPE keygenMech = CKM_AES_CBC_PAD;
   
   PK11SymKey* sym_key = PK11_KeyGen(PK11_GetBestSlot(keygenMech, NULL),
                                     keygenMech, 
