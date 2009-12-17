@@ -26,6 +26,26 @@
  */
 static GList* key_ring = NULL;
 
+/**
+ * Generates a fingerprint of an RSA Public Key. 
+ *
+ * @param key The public key that we want the fingerprint of.
+ * @param fingerprint The return value that is equal to the fingerprint of
+ *        of the key.
+ *
+ * @returns TRUE if the it succeeded in making a fingerprint, 
+ *          FALSE otherwise
+ */
+static void generate_fingerprint(char** print, SECKEYPublicKey* key) {
+   SECItem *hash = PK11_MakeIDFromPubKey(&key->u.rsa.modulus);
+   int i;
+   
+   for (i= 0; i < hash->len - 1; ++i) {
+      sprintf((*print) + (3*i), "%02x:", hash->data[i]);
+   }
+   sprintf((*print) + 3 * (hash->len - 1), "%02x", hash->data[(hash->len - 1)]);
+   SECITEM_ZfreeItem (hash, PR_TRUE);
+}
 
 /**
  * Finds a RSA_Key_Pair that has the given id. 
@@ -184,6 +204,25 @@ add_public_key (const char *pub_key_content, const char* id)
   
   // Set the public key (we should only have _our_ private key)
   key_pair->pub = public_key;
+
+  /**DEBUG**>*/
+  // Generate and
+  PurplePlugin *plugin = purple_plugins_find_with_id(PLUGIN_ID);
+  char *hash_string = g_malloc0(1024);
+  generate_fingerprint(&hash_string, key_pair->pub);
+  char *button_text = " has sent you a public key with fingerprint: ";
+  char *button_message = g_malloc0((strlen(key_pair->id_name)+strlen(button_text)+strlen(hash_string))*sizeof(char));
+  strcat(button_message, key_pair->id_name);
+  strcat(button_message, button_text);
+  strcat(button_message, hash_string);
+  gint *i = 12;
+  purple_request_action(plugin, "OK or Cancel", button_message, "Press 'Ok' to trust this key or 'Cancel' not to.", 
+    1, NULL, NULL, NULL, i, 2, "_Ok", NULL, "_Cancel", NULL);
+
+  purple_debug(PURPLE_DEBUG_INFO, PLUGIN_ID, "PLUGIN: %s HASH: %s\n", plugin->info->name, hash_string);
+  g_free(hash_string);
+   //static void generate_fingerprint(char** print, SECKEYPublicKey* key) {
+  /**<**DEBUG**/
   
   // Add the new key
   key_ring = g_list_append(key_ring, key_pair);
