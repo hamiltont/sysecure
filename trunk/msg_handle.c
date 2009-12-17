@@ -460,7 +460,7 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
   success = get_msg_component(*message,
                               crypt_tag, 
                               crypt_close_tag, 
-                              &sysecure_content); // TODO - make sure to free sysecure_content
+                              &sysecure_content);
   if (success == FALSE) 
   {
     purple_debug(PURPLE_DEBUG_INFO,
@@ -542,7 +542,7 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
      // Notify the user
      purple_conversation_write(conv, 
                                NULL, 
-	 					                  "SySecure: You received an encrypted message, but we were unable to understand the message. This should not have happened. Please contact developers to help ensure it does not continue happening!",
+	 					                  "SySecure: You received an encrypted message, but were unable to understand the message. This means that the remote sender used the wrong public key for you. Try sending them your latest key.",
 	 					                  PURPLE_MESSAGE_ERROR,
   					                  time(NULL));  
      
@@ -553,18 +553,18 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
      // Do not show the encrypted message
      return TRUE;
   }
-     
-  // Free the encrypted message, and put the decrypted message in it's place
-  // TODO - make sure this works!
 
-  enc_sender = g_malloc0((strlen(enc_sender_tag)+strlen(*sender))*sizeof(char));
+  // Create a new sender name
+  enc_sender = g_malloc0((strlen(enc_sender_tag) + strlen(*sender) + 1) * sizeof(char));
   strcat(enc_sender, *sender);
   strcat(enc_sender, enc_sender_tag);
   g_free(*sender);
-  g_free(*message);
-
-  *message = (char *)decrypted_message;
   *sender = enc_sender;
+
+  // Get rid of the old message and use the new one
+  g_free(*message);
+  *message = (char *)decrypted_message;
+
 
   // Clean up our memory
   g_free(sysecure_content);
@@ -628,14 +628,17 @@ add_tags_to_message (char *open_tag, char *close_tag, char *message, char **resu
  *                and a newly g_alloced() value will be returned in *message
  * @param sender The name of the sender
  * @param reveiver The name of the receiver
+ * @return TRUE if the message was created, and stored to *message. FALSE
+ *         otherwise
  *
  * @todo Add in the hashing function to the encryption
  * @todo It is not a good convention to have an output param also be an input
  *       param, because the function may fail in the middle, resulting in neither
  *       the input data, or the output data existing when it fails. Create 
- *       another signature for this method
+ *       another signature for this method, or make the current message 
+ *       guaranteed to either succeed, or to fail safely
  */
-static void 
+static gboolean 
 create_outgoing_msg (unsigned char **message, char *sender, const char *receiver)
 {
   //declare temporary variables
@@ -664,11 +667,7 @@ create_outgoing_msg (unsigned char **message, char *sender, const char *receiver
                   PLUGIN_ID,
                   "Unable to wrap the session key. Unable to continue creating the SySecure IM\n");
      
-     // TODO - Notify the user here that their send failed :/
-     // TODO - Also, at this point, the unencrypted message would be sent. We should
-     //        probably guard against this
-     
-     return;  
+     return FALSE;  
   }
     
   // Convert the SECItem into an ASCII char* that can be safely sent over IM
@@ -681,11 +680,7 @@ create_outgoing_msg (unsigned char **message, char *sender, const char *receiver
                   PLUGIN_ID,
                   "Unable to encode the session key. Unable to continue creating the SySecure IM\n");
      
-     // TODO - Notify the user here that their send failed :/
-     // TODO - Also, at this point, the unencrypted message would be sent. We should
-     //        probably guard against this
-     
-     return;
+     return FALSE;
   }
   
   // Add tags around the encrypted key, so it can be found and retrieved later
@@ -700,23 +695,16 @@ create_outgoing_msg (unsigned char **message, char *sender, const char *receiver
                 PLUGIN_ID,
                 "Unable to encrypt the IM. Unable to continue creating the SySecure IM\n");
           
-   // TODO - Notify the user here that their send failed :/
-   // TODO - Also, at this point, the unencrypted message would be sent. We should
-   //        probably guard against this
-   
    // Free the memory we were using
    g_free(temp_message);
    
-   return; 
+   return FALSE; 
   }
 
   // Convert the encrypted message into an ASCII armored format, so that it is 
   // safe to send over IM
   encrypted_message = BTOA_DataToAscii(temp_encrypted_message, encrypted_msg_length);
-  
-  // TODO - see if we need this memset. Jason had it commented out
-  //memset(encrypted_message + encrypted_msg_length, '\0', 1);
-  
+    
   // Enclose the encrypted message in the correct tags,
   add_tags_to_message(emsg_tag, emsg_close_tag, encrypted_message, &temp_message2);
   
@@ -750,6 +738,8 @@ create_outgoing_msg (unsigned char **message, char *sender, const char *receiver
   g_free(encrypted_message);
   g_free(temp_encrypted_message);
   g_free(wrapped_keybuff);
+  
+  return TRUE;
 }
 
 /**
@@ -792,6 +782,7 @@ sending_im_cb (PurpleAccount *account, const char *receiver, char **message)
   unsigned char* temp_message;    // Used later to copy the message
   PurpleConversation* conv;   // Used to notify the user of an error by writing
                               // it to their conversation window
+  gboolean success; // Used in various places to indicate success of last call
 
   // We only have something to do if encryption is enabled, and there is a 
   // message
@@ -804,6 +795,16 @@ sending_im_cb (PurpleAccount *account, const char *receiver, char **message)
                  PLUGIN_ID,
                  "Encryption disabled for conversation with %s\n",
                  receiver);
+    return;
+  }
+  
+  // Be sure that we don't accidentally encrypt the public key and send that 
+  if (get_tag_location(*message, pub_tag) != NULL)
+  {
+    purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID,
+                 "Prevented sending the public key as an encrypted message\n");
+    
     return;
   }
   
@@ -837,10 +838,12 @@ sending_im_cb (PurpleAccount *account, const char *receiver, char **message)
 	  					                PURPLE_MESSAGE_ERROR,
 	  					                time(NULL)); 
    
-   // TODO - set the message to NULL to prevent an unencrypted message from being sent into the network!!
+    // Make sure the unencrypted message does not make it to the network
+    g_free(*message);
+    *message = g_malloc0((strlen("I would like to send you an encrypted message. Could you please send me your public key?") + 1) * sizeof(char));
+    strcpy(*message,"I would like to send you an encrypted message. Could you please send me your public key?");
     
-	  // Do not show the message in the chat window    
-    return;
+	  return;
   }
   
   // Make sure we trust the public key
@@ -858,7 +861,11 @@ sending_im_cb (PurpleAccount *account, const char *receiver, char **message)
 	  					                PURPLE_MESSAGE_ERROR,
 	  					                time(NULL));
 	  
-	  // TODO - set the message to NULL to prevent an unencrypted message from being sent into the network!!
+	  // Make sure the unencrypted message does not make it to the network
+    g_free(*message);
+    *message = g_malloc0((strlen("I would like to send you an encrypted message. Could you please send me your public key?") + 1) * sizeof(char));
+    strcpy(*message,"I would like to send you an encrypted message. Could you please send me your public key?");
+
     return;   
   }
   
@@ -868,15 +875,16 @@ sending_im_cb (PurpleAccount *account, const char *receiver, char **message)
   // point. That method is free to use the pointer you pass it, so we don't
   // want to accidentally corrupt that. 
   // TODO - change this to _not_ copy the memory here once we have changed the 
-  //        create_outgoing_msg() params
+  //        create_outgoing_msg() params or ensured the safety of the message 
+  //        param
   temp_message = g_malloc0((strlen(*message) + 1) *sizeof(char));
   memcpy(temp_message, *message, strlen(*message));
 
   // Actually create the SySecure message from the standard IM messsage. 
   // Store to temp_message
-  create_outgoing_msg(&temp_message, account->username, receiver);
+  success = create_outgoing_msg(&temp_message, account->username, receiver);
   
-  if (temp_message == NULL)
+  if (success == FALSE || temp_message == NULL)
   {
     purple_debug(PURPLE_DEBUG_ERROR,
                  PLUGIN_ID,
@@ -889,18 +897,15 @@ sending_im_cb (PurpleAccount *account, const char *receiver, char **message)
 	  					                time(NULL));
 	  
 	  purple_conversation_write(conv, 
-                              "Some plugin", 
-	  					                "Some err",
-	  					                PURPLE_MESSAGE_ERROR,
-	  					                time(NULL));
-	  
-	  purple_conversation_write(conv, 
                               "SySecure", 
 	  					                *message,
 	  					                PURPLE_MESSAGE_ERROR,
 	  					                time(NULL));
 	 
-	  // TODO - Do not send unsecure IM into network!
+    // Make sure the unencrypted message does not make it to the network
+    g_free(*message);
+    *message = g_malloc0((strlen("I would like to send you an encrypted message. Could you please send me your public key?") + 1) * sizeof(char));
+    strcpy(*message,"I would like to send you an encrypted message. Could you please send me your public key?");
 	  
     return;
   }

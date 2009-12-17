@@ -151,6 +151,14 @@ show_chats_cb(GtkWidget *widget, gboolean data)
 static void 
 conversation_switched_cb(PurpleConversation *conv)
 {
+  if (encryption_menuitem == NULL || decryption_menuitem == NULL)
+  {
+    purple_debug(PURPLE_DEBUG_ERROR,
+                 PLUGIN_ID,
+                 "Prevented Seg fault. Conversation switched callback was fired before the encryption/decryption menuitems had been created\n");
+    return;
+  }
+  
   if (get_encryption_info(conv)->is_encrypted == TRUE) 
   {
     gtk_widget_set_sensitive(encryption_menuitem,
