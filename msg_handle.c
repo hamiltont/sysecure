@@ -551,6 +551,7 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
   // Free the encrypted message, and put the decrypted message in it's place
   // TODO - make sure this works!
   g_free(*message);
+
   *message = (char *)decrypted_message;
 
   // Clean up our memory
