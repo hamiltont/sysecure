@@ -46,8 +46,6 @@ find_key_pair (const char * key_val, RSA_Key_Pair** key_pair_ptr)
 {
   // Declare vars
   GList *temp_ptr;
-  char* lowercase_key_val;
-  int current;
   purple_debug(PURPLE_DEBUG_INFO, PLUGIN_ID, "MK1:key_val: %s\n", key_val);
   // Is it even worth our time?
   if (!key_ring)
@@ -58,25 +56,11 @@ find_key_pair (const char * key_val, RSA_Key_Pair** key_pair_ptr)
   
   // Init vars
   temp_ptr = key_ring;
-  lowercase_key_val = g_malloc0((strlen(key_val) + 1) * sizeof(char)); // Plus null terminating char
-  purple_debug(PURPLE_DEBUG_INFO, PLUGIN_ID, "MK2:lowercase_key_val: %s\n", lowercase_key_val);
   // Convert key_val to lowercase
   // This avoids some problems, but should probably be changed in the long run
   // Note that libpurple seems to do this internally, so perhaps it is ok? 
   // Answer: There is a purple_normalize() function that works differently for each
   // protocol. We should find and implement this! 
-  strcpy(lowercase_key_val, key_val);
-  current = 0;
-   purple_debug(PURPLE_DEBUG_INFO, PLUGIN_ID, "MK3:lowercase_key_val: %s key_val: %s\n", lowercase_key_val, key_val);
-   purple_debug(PURPLE_DEBUG_INFO, PLUGIN_ID, "strlen(key_val): %i strlen(lowercase_key_val): %i\n", strlen(key_val), strlen(lowercase_key_val));
-  while (*(lowercase_key_val+current) != '\0')
-  {
-    purple_debug(PURPLE_DEBUG_INFO, PLUGIN_ID, "lowercase_key_val[%i]: %c\n", current, *(lowercase_key_val + current));
-    *(lowercase_key_val+current) = tolower(*(lowercase_key_val+current));
-    ++current;
-    purple_debug(PURPLE_DEBUG_INFO, PLUGIN_ID, "post current: %i\n", current);
-  }
-  
   // Look for the correct RSA
   while (temp_ptr != NULL)
   {
@@ -87,24 +71,20 @@ find_key_pair (const char * key_val, RSA_Key_Pair** key_pair_ptr)
                  "looking at key with id: %s\n",
                  (*key_pair_ptr)->id_name);
                  
-    if (strcmp((*key_pair_ptr)->id_name, lowercase_key_val) == 0)
+    if (g_ascii_strncasecmp((*key_pair_ptr)->id_name, key_val, strlen(key_val)) == 0)
     {
       purple_debug(PURPLE_DEBUG_INFO,
                    PLUGIN_ID,
                    "temp_key->id: %s equals name: %s.\n",
                    (*key_pair_ptr)->id_name, 
-                   lowercase_key_val);
-      
-      // Free what we have allocated
-      g_free(lowercase_key_val);
-      
+                   key_val);
       return TRUE;
     }
     purple_debug(PURPLE_DEBUG_INFO,
                  PLUGIN_ID,
                  "temp_key->id: %s does not equal name: %s.\n", 
                  (*key_pair_ptr)->id_name, 
-                 lowercase_key_val);
+                 key_val);
     
     temp_ptr = g_list_next(temp_ptr);
   }
@@ -112,8 +92,6 @@ find_key_pair (const char * key_val, RSA_Key_Pair** key_pair_ptr)
   // If not found, clear the pointer to make sure they do not use the wrong one
   *key_pair_ptr = NULL;
   
-  // Free the memory we used
-  g_free(lowercase_key_val);
   return FALSE;
 }
 
@@ -142,7 +120,6 @@ add_public_key (const char *pub_key_content, const char* id)
   RSA_Key_Pair *key_check;  // var used only as a parameter placeholder
   
   RSA_Key_Pair *temp;
-  int current; // Used as a loop counter later
 
   if (find_key_pair(id, &key_check))
   {
@@ -201,18 +178,6 @@ add_public_key (const char *pub_key_content, const char* id)
   // Create and set id_name
   key_pair->id_name = g_malloc0((strlen(id) + 1) * sizeof(char));
   strcat(key_pair->id_name, id);
-  
-  // Convert id_name to lowercase
-  // This avoids some problems, but should probably be changed in the long run
-  // Note that libpurple seems to do this internally, so perhaps it is ok?
-  // Answer: There is a purple_normalize() function that works differently for each
-  // protocol. We should find and implement this! 
-  current = 0;
-  while (key_pair->id_name[current] != '\0')
-  {
-    key_pair->id_name[current] = tolower(key_pair->id_name[current]);
-    current++;
-  }
   
   // Auto trust
   key_pair->trusted = TRUE;
