@@ -48,7 +48,7 @@ find_key_pair (const char * key_val, RSA_Key_Pair** key_pair_ptr)
   GList *temp_ptr;
   char* lowercase_key_val;
   int current;
-  
+  purple_debug(PURPLE_DEBUG_INFO, PLUGIN_ID, "MK1:key_val: %s\n", key_val);
   // Is it even worth our time?
   if (!key_ring)
   {
@@ -59,7 +59,7 @@ find_key_pair (const char * key_val, RSA_Key_Pair** key_pair_ptr)
   // Init vars
   temp_ptr = key_ring;
   lowercase_key_val = g_malloc0((strlen(key_val) + 1) * sizeof(char)); // Plus null terminating char
-  
+  purple_debug(PURPLE_DEBUG_INFO, PLUGIN_ID, "MK2:lowercase_key_val: %s\n", lowercase_key_val);
   // Convert key_val to lowercase
   // This avoids some problems, but should probably be changed in the long run
   // Note that libpurple seems to do this internally, so perhaps it is ok? 
@@ -67,8 +67,15 @@ find_key_pair (const char * key_val, RSA_Key_Pair** key_pair_ptr)
   // protocol. We should find and implement this! 
   strcpy(lowercase_key_val, key_val);
   current = 0;
-  while (lowercase_key_val[current])
-    lowercase_key_val[current] = tolower(lowercase_key_val[current++]);
+   purple_debug(PURPLE_DEBUG_INFO, PLUGIN_ID, "MK3:lowercase_key_val: %s key_val: %s\n", lowercase_key_val, key_val);
+   purple_debug(PURPLE_DEBUG_INFO, PLUGIN_ID, "strlen(key_val): %i strlen(lowercase_key_val): %i\n", strlen(key_val), strlen(lowercase_key_val));
+  while (*(lowercase_key_val+current) != '\0')
+  {
+    purple_debug(PURPLE_DEBUG_INFO, PLUGIN_ID, "lowercase_key_val[%i]: %c\n", current, *(lowercase_key_val + current));
+    *(lowercase_key_val+current) = tolower(*(lowercase_key_val+current));
+    ++current;
+    purple_debug(PURPLE_DEBUG_INFO, PLUGIN_ID, "post current: %i\n", current);
+  }
   
   // Look for the correct RSA
   while (temp_ptr != NULL)
@@ -201,8 +208,11 @@ add_public_key (const char *pub_key_content, const char* id)
   // Answer: There is a purple_normalize() function that works differently for each
   // protocol. We should find and implement this! 
   current = 0;
-  while (key_pair->id_name[current])
-    key_pair->id_name[current] = tolower(key_pair->id_name[current++]);
+  while (key_pair->id_name[current] != '\0')
+  {
+    key_pair->id_name[current] = tolower(key_pair->id_name[current]);
+    current++;
+  }
   
   // Auto trust
   key_pair->trusted = TRUE;
@@ -436,9 +446,9 @@ gboolean pub_key_encrypt (char **enc_msg, char **orig_msg, char *key_val)
   //Determine the total number of blocks needed
   num_blocks = ((strlen(*orig_msg) - 1)/unpadded_block_len) + 1;
 
-  padded_block = malloc(modulus_length);
-  *enc_msg = malloc(modulus_length * num_blocks);
-  decrypted = malloc(modulus_length * num_blocks);
+  padded_block = g_malloc0(modulus_length);
+  *enc_msg = g_malloc0(modulus_length * num_blocks);
+  decrypted = g_malloc0(modulus_length * num_blocks);
 
   PK11_PubEncryptPKCS1(key, *enc_msg, *orig_msg, strlen(*orig_msg), 0);
 
@@ -491,7 +501,7 @@ wrap_symkey (PK11SymKey *key, SECItem **key_data, const char* name)
   
   data = (SECItem *) g_malloc0(sizeof(SECItem));
   data->len = SECKEY_PublicKeyStrength(key_pair->pub);
-  data->data = malloc(data->len * sizeof(char));
+  data->data = g_malloc0(data->len * sizeof(char));
   s = PK11_PubWrapSymKey(CKM_RSA_PKCS, key_pair->pub, key, data);
   *key_data = data;
   return TRUE;

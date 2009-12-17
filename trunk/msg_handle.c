@@ -717,7 +717,7 @@ create_outgoing_msg (unsigned char **message, char *sender, const char *receiver
   
   // Create room to store the full SySecure IM content
   // Size of the packaged session key, plus the encrypted message, plus the null
-  temp_message3 = malloc((strlen(temp_message)+strlen(temp_message2) + 1)*sizeof(char));
+  temp_message3 = g_malloc0((strlen(temp_message)+strlen(temp_message2) + 1)*sizeof(char));
   memset(temp_message3, 0, strlen(temp_message) + strlen(temp_message2) + 1);
   strcat(temp_message3, temp_message);
   strcat(temp_message3, temp_message2);
@@ -731,12 +731,12 @@ create_outgoing_msg (unsigned char **message, char *sender, const char *receiver
   add_tags_to_message(crypt_tag, crypt_close_tag, temp_message3, (char **)message);
 
   // Free all the temp vars  
-  free(temp_message);
-  free(temp_message2);
-  free(temp_message3);
-  free(encrypted_message);
-  free(temp_encrypted_message);
-  free(wrapped_keybuff);
+  g_free(temp_message);
+  g_free(temp_message2);
+  g_free(temp_message3);
+  g_free(encrypted_message);
+  g_free(temp_encrypted_message);
+  g_free(wrapped_keybuff);
 }
 
 /**

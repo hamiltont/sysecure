@@ -85,7 +85,7 @@ get_encryption_info_from_name(const char * conversation_name)
                         conversation_name);
       
       // Copy the conversation name, so we are guaranteed we don't loose our key
-      char *copy = malloc(strlen(conversation_name) * sizeof(char));
+      char *copy = g_malloc0(strlen(conversation_name) * sizeof(char));
       memset(copy,0,strlen(conversation_name));
       strncpy(copy,conversation_name, strlen(conversation_name) + 1);
       
