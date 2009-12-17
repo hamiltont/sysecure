@@ -437,7 +437,7 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
   // enc_sender will be used to overwrite **sender
   //if we decrypt a message (in order to distinguish
   //the encrypted messages from the plain text ones).
-  char *enc_sender_tag = "(ENC)";
+  char *enc_sender_tag = "-enc";
   char *enc_sender;
   
   // Used in many places to indicate current success or failure
