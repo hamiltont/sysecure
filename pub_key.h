@@ -1,9 +1,24 @@
+#ifndef PURPLE_PLUGINS
+#  define PURPLE_PLUGINS
+#endif
+
+#include <glib.h>
+
+#ifndef G_GNUC_NULL_TERMINATED
+#  if __GNUC__ >= 4
+#    define G_GNUC_NULL_TERMINATED __attribute__((__sentinel__))
+#  else
+#    define G_GNUC_NULL_TERMINATED
+#  endif /* __GNUC__ >= 4 */
+#endif /* G_GNUC_NULL_TERMINATED */
+
 #ifndef PUB_KEY_H
 #define PUB_KEY_H
 
 //LIBPURPLE Includes
 #include "plugin.h"
 #include "debug.h"
+#include "request.h"
 
 //GLIB Includes
 #include "glib.h"
