@@ -433,6 +433,12 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
   char *sysecure_content;
   char *pub_key_content;
   char *decrypted_message;
+
+  // enc_sender will be used to overwrite **sender
+  //if we decrypt a message (in order to distinguish
+  //the encrypted messages from the plain text ones).
+  char *enc_sender_tag = "(ENC)";
+  char *enc_sender;
   
   // Used in many places to indicate current success or failure
   gboolean success; 
@@ -550,9 +556,15 @@ receiving_im_cb (PurpleAccount *acct, char **sender, char **message,
      
   // Free the encrypted message, and put the decrypted message in it's place
   // TODO - make sure this works!
+
+  enc_sender = g_malloc0((strlen(enc_sender_tag)+strlen(*sender))*sizeof(char));
+  strcat(enc_sender, *sender);
+  strcat(enc_sender, enc_sender_tag);
+  g_free(*sender);
   g_free(*message);
 
   *message = (char *)decrypted_message;
+  *sender = enc_sender;
 
   // Clean up our memory
   g_free(sysecure_content);
