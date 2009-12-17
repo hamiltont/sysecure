@@ -33,6 +33,9 @@
 // Allows our button callbacks to actually perform some actions ;)
 #include "conv_encrypt_map.h"
 
+// Used to send the public key
+#include "msg_handle.h"
+
 // Used to debug the session stuff
 #include "session_keys.h"
 
@@ -48,6 +51,32 @@
 
 static GtkWidget * encryption_menuitem,
                  * decryption_menuitem;
+
+/**
+ * Callback for the 'Send Public Key' menu item
+ *
+ * @param widget The widget that caused this callback. In this case, 
+ *               the Menuitem
+ * @param gtk_conv The GTK+ (Pidgin) conversation showing when this 
+ *                 menu item was clicked. 
+ */ 
+static void
+send_public_key_cb(GtkWidget *widget, PidginConversation *gtk_conv)
+{
+  // Used to hold the 'active' pidgin conversation
+  // We have no guarantee that the conversation passed to us is the 
+  // conversation currently showing on the screen (AKA the one we would 
+  // like to turn encryption on for). When someone is using tabbed IMs, the 
+  // PidginConversation returned to us is the first conversation that opened 
+  // that window (because the menubar aka our menuitem exists for _that_ 
+  // conversation). In order to figure out what conversation is actually showing
+  // we use this method
+  PidginConversation *active_conv = pidgin_conv_window_get_active_gtkconv(gtk_conv->win);
+
+  // TODO - if the return value means anything for this, we should update this 
+  //        part
+  send_pub_key (active_conv->active_conv);
+}
 
 /**
  * Callback for the 'Enable Encryption' menu item
@@ -193,7 +222,7 @@ static void
 conversation_displayed_cb(PidginConversation *gtk_conv)
 {
   // Items we will be creating
-  GtkWidget *submenu, *submenuitem, *submenuitem2, *ss_menuitem;
+  GtkWidget *submenu, *submenuitem, *submenuitem2, *submenuitem3, *ss_menuitem;
   
   // Items we will be loading
   GtkWidget *menubar;
@@ -243,7 +272,8 @@ conversation_displayed_cb(PidginConversation *gtk_conv)
   g_signal_connect(G_OBJECT(submenuitem), 
 		   "activate", 
 		   G_CALLBACK(show_chats_cb), 
-		   NULL);
+		   gtk_conv);
+
 		   
   // Then the Debug Session Key button
   submenuitem2 = gtk_menu_item_new_with_label ("Debug Session Key");
@@ -253,7 +283,17 @@ conversation_displayed_cb(PidginConversation *gtk_conv)
   g_signal_connect(G_OBJECT(submenuitem2), 
 		   "activate", 
 		   G_CALLBACK(debug_session_cb), 
-		   NULL);
+		   gtk_conv);
+		   
+	// Then the Send Public Key button
+  submenuitem3 = gtk_menu_item_new_with_label ("Send Public Key");
+  gtk_menu_shell_append(GTK_MENU_SHELL(submenu), 
+			submenuitem3);
+  gtk_widget_show(submenuitem3);
+  g_signal_connect(G_OBJECT(submenuitem3), 
+		   "activate", 
+		   G_CALLBACK(send_public_key_cb), 
+		   gtk_conv);
 
   // Add the SySecure menu item to the window menubar, and 
   // attach the submenu to the menu item

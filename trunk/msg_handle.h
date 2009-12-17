@@ -76,6 +76,8 @@ void sending_im_cb (PurpleAccount *account, const char *receiver, char **message
 
 void SYS_create_conversation_cb (PurpleConversation *conv);
 
+gboolean send_pub_key (PurpleConversation *conv);
+
 char* get_tag_location (char *message, char *tag);
 
 #endif //MSG_HANDLE_H
