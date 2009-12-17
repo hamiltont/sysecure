@@ -160,16 +160,41 @@ debug_symmetric_key(PK11SymKey * key)
 unsigned char * 
 encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
 {
+
+  char * plain_cpy;
   // Turn our static IV into a SECItem
   SECItem ivItem;
   ivItem.type = siBuffer;
   ivItem.data = gIV;
   ivItem.len = sizeof(gIV);
+
+  // Fix a random bug by preventing any multiple of the block size
+  // This this might have to do with the digest (aka encrypt final) operation, 
+  // as i think that function call takes care of adding the padding. If the 
+  // padding is not needed, it returns SECFailure on UBuntu and segfaults win
+  // Add a single space char to the end of the message
+  // Alloc enough for the null term, plus one space (if we need it)
+  plain_cpy = g_malloc0((strlen(plain) + 2) * sizeof(char));
+  strcpy(plain_cpy, plain);
+  if ((strlen((char*)plain) + 1) % 16 == 0)
+  {
+    purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID,
+                 "Prevented crash from block size\n");
+    strcat(plain_cpy, " ");
+    
+    purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID,
+                 "Old string was '%s', new is '%s'\n",
+                 plain,
+                 plain_cpy);
+
+  }
   
   purple_debug_info(PLUGIN_ID,
                     "Encrypting '%s' with length %i\n",
-                    plain,
-                    strlen((char*)plain)+1);
+                    plain_cpy,
+                    strlen((char*)plain_cpy)+1);
   
   // Get the parameters needed to start performing the specificed type of 
   // encryption, using our IV as the seed if a seed is needed for this enc.
@@ -191,6 +216,9 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
     purple_debug_error(PLUGIN_ID,
                        "For SySecure, this likely indicates that no IV was provided\n");
                        
+    // Cleanup
+    g_free(plain_cpy);                   
+                       
     return NULL;
   }
   
@@ -204,7 +232,7 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
   
   // We are using a block cipher, so our output buffer needs to be
   // (1) at least as big as the input text
-  int out_buf_size = strlen((char *)plain) * sizeof(char); // cast to remove 
+  int out_buf_size = strlen((char *)plain_cpy) * sizeof(char); // cast to remove 
                                                            // compiler warning 
   // (2) plus one extra block, in case the input had to be padded to complete
   //     filling the last block
@@ -222,6 +250,10 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
   {
     purple_debug_error(PLUGIN_ID,
                        "Unable to allocate memory to store the encrypted message!\n");
+    
+    // Cleanup
+    g_free(plain_cpy);
+    
     return NULL;
   }
                                          
@@ -230,15 +262,15 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
   // much was used
   int outlen = 0;
   
-  fprintf(stderr, "Input data length: %i\n", strlen((char*)plain) + 1);
+  fprintf(stderr, "Input data length: %i\n", strlen((char*)plain_cpy) + 1);
     
   // Perform the encryption 
   SECStatus cipher_status = PK11_CipherOp(EncContext,         // Context, useful for chaining operations
                               outbuf,             // Buf to store result     
                               &outlen,            // Out param - turns into the length of the result
                               out_buf_size,       // The max size the output 
-                              plain,              // Input data
-                              strlen((char *)plain) + 1); // Input data length (amount to encrypt)
+                              plain_cpy,              // Input data
+                              strlen((char *)plain_cpy) + 1); // Input data length (amount to encrypt)
   
   
   // check that the cipher succeeded
@@ -264,6 +296,9 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
                       "Freeing pointer at %p",
                       outbuf);
     g_free(outbuf);
+    
+    // Cleanup
+    g_free(plain_cpy);
     
     return NULL;
   }
@@ -316,6 +351,9 @@ encrypt(PK11SymKey *key, unsigned char * plain, unsigned int * result_length)
     purple_debug_misc(PLUGIN_ID,
                       "Freeing pointer at %p\n",
                       outbuf);
+    
+    // Cleanup
+    g_free(plain_cpy);
     g_free(outbuf);
     
     return NULL;
