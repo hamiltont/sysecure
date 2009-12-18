@@ -868,6 +868,11 @@ sending_im_cb (PurpleAccount *account, const char *receiver, char **message)
 
     return;   
   }
+  else
+    purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID,
+                 "%s's is trusted.\n", 
+                 receiver);
   
   
   // Copy the passed message into a temporary variable. 
@@ -979,13 +984,6 @@ send_pub_key (PurpleConversation *conv)
                                    pub_key_message,
                                    flags);	
    
-   //DEBUG ONLY
-   /*key_check = NSSBase64_DecodeBuffer(0, 0, key_buffer, strlen(key_buffer));
-   if(SECITEM_ItemsAreEqual(key_data, key_check))
-     purple_debug(PURPLE_DEBUG_INFO, "SySecure", "Pub Key encoded and decoded successfully\n");
-   else
-     purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "Pub Key encoded and decoded UNSUCCESSFULLY\n");
-   */
    return TRUE;
 }
 

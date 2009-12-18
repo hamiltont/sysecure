@@ -63,4 +63,6 @@ gboolean unwrap_symkey (SECItem *wrappedKey, char* name, PK11SymKey **unwrapped_
 
 PRBool compare_symkeys (PK11SymKey *key1, PK11SymKey *key2);
 
+PRBool compare_publickeys (SECKEYPublicKey* key1, SECKEYPublicKey* key2);
+
 #endif //PUB_KEY_H

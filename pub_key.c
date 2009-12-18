@@ -26,6 +26,8 @@
  */
 static GList* key_ring = NULL;
 
+static RSA_Key_Pair* current_key = NULL;
+
 /**
  * Generates a fingerprint of an RSA Public Key. 
  *
@@ -115,6 +117,28 @@ find_key_pair (const char * key_val, RSA_Key_Pair** key_pair_ptr)
   return FALSE;
 }
 
+void
+trust_key (void)
+{
+  if (current_key != NULL)
+    current_key->trusted = TRUE;
+  purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID, 
+                 "Setting trust for %s's key to TRUE.\n", 
+                 current_key->id_name);
+}
+
+void
+do_not_trust_key (void)
+{
+  if (current_key != NULL)
+    current_key->trusted = FALSE;
+  purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID, 
+                 "Setting trust for %s's key to FALSE.\n", 
+                 current_key->id_name);
+}
+
 /**
  * Accepts the content from a public key announcement message, converts it into
  * a RSA_Key_Pair and stores that (using the passed id as the RSA_Key_Pair id)
@@ -137,12 +161,29 @@ add_public_key (const char *pub_key_content, const char* id)
   CERTSubjectPublicKeyInfo *key_info;   // temporary certificate. More on this below
   SECKEYPublicKey *public_key;          // the actual key
   RSA_Key_Pair *key_pair = g_malloc(sizeof(RSA_Key_Pair)); // the struct we are creating
-  RSA_Key_Pair *key_check;  // var used only as a parameter placeholder
-  
+  RSA_Key_Pair *key_check;
   RSA_Key_Pair *temp;
+  
+  // Get the public key from the data stream
+  key_data = NSSBase64_DecodeBuffer(0, 0, pub_key_content, strlen(pub_key_content));
+   
+  // NSS assumes that a public key won't be used w/o a certificate to validate
+  // the key to ID binding. Because we are creating a key from raw data, NSS
+  // wraps it in a temporary certificate, and returns that to us. We promptly
+  // throw it away :) 
+  key_info = SECKEY_DecodeDERSubjectPublicKeyInfo(key_data);
+  public_key = SECKEY_ExtractPublicKey(key_info);
 
   if (find_key_pair(id, &key_check))
   {
+    if (compare_publickeys(key_check->pub, public_key) && key_check->trusted)
+    {
+      purple_debug(PURPLE_DEBUG_INFO,
+                 PLUGIN_ID, 
+                 "Key exists for %s and matches new key.\n", 
+                 id);
+      return TRUE;
+    }
     purple_debug(PURPLE_DEBUG_INFO,
                  PLUGIN_ID, 
                  "Key exists for %s. Destroying old public key.\n", 
@@ -167,27 +208,7 @@ add_public_key (const char *pub_key_content, const char* id)
       // TODO - print out a fat error message
       return TRUE;
     }
-                                 
-    /**
-      RSA_Key_Pair *debug_key;
-      char name[] = "nataliarevenan";
-      find_key_pair(name, &debug_key);
-      if (SECITEM_ItemsAreEqual(SECKEY_EncodeDERSubjectPublicKeyInfo(key_check->pub), SECKEY_EncodeDERSubjectPublicKeyInfo(debug_key->pub)))
-        purple_debug(PURPLE_DEBUG_INFO, "SySecure", "And it was decoded properly %s's key matches %s's key!\n", key_check->id_name, debug_key->id_name);
-      else
-        purple_debug(PURPLE_DEBUG_ERROR, "SySecure", "It was decoded improperly!.\n");
-    */
   }
-  
-  // Get the public key from the data stream
-  key_data = NSSBase64_DecodeBuffer(0, 0, pub_key_content, strlen(pub_key_content));
-   
-  // NSS assumes that a public key won't be used w/o a certificate to validate
-  // the key to ID binding. Because we are creating a key from raw data, NSS
-  // wraps it in a temporary certificate, and returns that to us. We promptly
-  // throw it away :) 
-  key_info = SECKEY_DecodeDERSubjectPublicKeyInfo(key_data);
-  public_key = SECKEY_ExtractPublicKey(key_info);
 
   // Copy the key and append it to the key_ring
   purple_debug(PURPLE_DEBUG_INFO,
@@ -200,31 +221,42 @@ add_public_key (const char *pub_key_content, const char* id)
   strcat(key_pair->id_name, id);
   
   // Auto trust
-  key_pair->trusted = TRUE;
+  //key_pair->trusted = TRUE;
   
   // Set the public key (we should only have _our_ private key)
   key_pair->pub = public_key;
 
-  /**DEBUG**>*/
-  // Generate and
+  // Due to an annoying inability to pass parameters in 
+  // purple_request_action callbacks, use "current_key" global
+  // to store the key we are looking to add.
+
+  current_key = key_pair;
+
+  // Get the current plugin with our ID
   PurplePlugin *plugin = purple_plugins_find_with_id(PLUGIN_ID);
+
+  // Generate a hash of the public key that we are adding
   char *hash_string = g_malloc0(1024);
   generate_fingerprint(&hash_string, key_pair->pub);
+
+  // The following just creates the text that will appear in the 
+  // pop up window.
   char *button_text = " has sent you a public key with fingerprint: ";
   char *button_message = g_malloc0((strlen(key_pair->id_name)+strlen(button_text)+strlen(hash_string))*sizeof(char));
   strcat(button_message, key_pair->id_name);
   strcat(button_message, button_text);
   strcat(button_message, hash_string);
+
+  // Here is a purple_request_action call which will cause a window to pop up and 
+  // ask the user if they would like to trust the incoming key 
   gint *i = 12;
   purple_request_action(plugin, "OK or Cancel", button_message, "Press 'Ok' to trust this key or 'Cancel' not to.", 
-    1, NULL, NULL, NULL, i, 2, "_Ok", NULL, "_Cancel", NULL);
+    1, NULL, NULL, NULL, i, 2, "_Ok", trust_key, "_Cancel", do_not_trust_key);
 
   purple_debug(PURPLE_DEBUG_INFO, PLUGIN_ID, "PLUGIN: %s HASH: %s\n", plugin->info->name, hash_string);
   g_free(hash_string);
-   //static void generate_fingerprint(char** print, SECKEYPublicKey* key) {
-  /**<**DEBUG**/
   
-  // Add the new key
+  // Note that in this implementation we always add the key.
   key_ring = g_list_append(key_ring, key_pair);
   
   purple_debug(PURPLE_DEBUG_INFO,
@@ -585,6 +617,16 @@ compare_symkeys (PK11SymKey *key1, PK11SymKey *key2)
   SECItem *raw_key2 = 0;
   raw_key1 = PK11_GetKeyData(key1);
   raw_key2 = PK11_GetKeyData(key2);
+  return SECITEM_ItemsAreEqual(raw_key1, raw_key2);
+}
+
+PRBool
+compare_publickeys (SECKEYPublicKey* key1, SECKEYPublicKey* key2)
+{
+  SECItem *raw_key1 = 0;
+  SECItem *raw_key2 = 0;
+  raw_key1 = SECKEY_EncodeDERSubjectPublicKeyInfo(key1);
+  raw_key2 = SECKEY_EncodeDERSubjectPublicKeyInfo(key2);
   return SECITEM_ItemsAreEqual(raw_key1, raw_key2);
 }
 
