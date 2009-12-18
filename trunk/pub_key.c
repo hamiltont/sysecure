@@ -7,6 +7,8 @@
  * References:
  *  1) William Tompkins, "Pidgin-Encryption: rsa_nss.c," 
  *     (http://pidgin-encrypt.sourceforge.net/install.php)
+ *    A number of the functions in this file are modeled after
+ *    examples found in this example plugin.
  * 
  */
 
@@ -257,12 +259,22 @@ add_public_key (const char *pub_key_content, const char* id)
   g_free(hash_string);
   
   // Note that in this implementation we always add the key.
-  key_ring = g_list_append(key_ring, key_pair);
+  if (key_pair->trusted)
+  {
+    key_ring = g_list_append(key_ring, key_pair);
   
-  purple_debug(PURPLE_DEBUG_INFO,
+    purple_debug(PURPLE_DEBUG_INFO,
                PLUGIN_ID, 
                "New key created for: %s.\n",
                key_pair->id_name);
+  }
+  else
+  {
+    purple_debug(PURPLE_DEBUG_INFO,
+               PLUGIN_ID, 
+               "Untrusted key for %s deleted.\n",
+               key_pair->id_name);
+  }
   
   return TRUE;
 }
